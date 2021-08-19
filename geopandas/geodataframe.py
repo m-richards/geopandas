@@ -1379,6 +1379,15 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
     # Implement pandas methods
     #
 
+    # def copy(self, deep=True):
+    #     df = super().copy(deep=deep)
+    #     # copy can be the first refresh method after a state change,
+    #     so this shouldn't always be a gdf
+    #     if self._geometry_column_name in df.columns:
+    #         # Copy loses metadata, because constructor_ loses metadata
+    #         df = GeoDataFrame(df, geometry=self._geometry_column_name, crs=self.crs)
+    #     return df
+
     def merge(self, *args, **kwargs):
         r"""Merge two ``GeoDataFrame`` objects with a database-style join.
 
