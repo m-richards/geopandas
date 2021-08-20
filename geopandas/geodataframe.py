@@ -1722,17 +1722,25 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
         -------
         GeoDataFrame or DataFrame
         """
-        df = super().astype(dtype, copy=copy, errors=errors, **kwargs)
-
+        df = pd.DataFrame(self).astype(dtype, copy=copy, errors=errors, **kwargs)
         try:
             geoms = df[self._geometry_column_name]
             if is_geometry_type(geoms):
                 return geopandas.GeoDataFrame(df, geometry=self._geometry_column_name)
+        # cases where we do not return a GeoDataFrame
         except KeyError:
-            pass
-        # if the geometry column is converted to non-geometries or did not exist
-        # do not return a GeoDataFrame
-        return pd.DataFrame(df)
+            pass  # if the geometry column doesn't exist
+        except TypeError as e:
+            #  if geom col is convert to non geometry
+            # TODO not a robust check
+            if "Input must be valid geometry objects" in str(e) and isinstance(
+                str, geoms.iloc[0]
+            ):
+                pass
+            else:
+                raise e
+
+        return df
 
     def to_postgis(
         self,
