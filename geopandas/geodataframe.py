@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 from pandas.core.accessor import CachedAccessor
+from pandas.core.internals import BlockManager
 
 from shapely.geometry import mapping, shape
 from shapely.geometry.base import BaseGeometry
@@ -1447,18 +1448,27 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
 
     @property
     def _constructor(self):
+        geometry_default = getattr(self, "_geometry_column_name", None)
+        crs_default = getattr(self, "crs")
+
         def _geodataframe_constructor_with_fallback(
-            data=None, index=None, crs=None, geometry=None, **kwargs
+            data=None, index=None, crs=crs_default, geometry=geometry_default, **kwargs
         ):
+            if type(data) is BlockManager:
+                if isinstance(geometry, str) and geometry not in data.items:
+                    geometry = None
+            elif isinstance(geometry, str) and isinstance(data, DataFrame):
+                if geometry not in data.columns:
+                    geometry = None
             df = GeoDataFrame(
                 data=data, index=index, crs=crs, geometry=geometry, **kwargs
             )
             geometry_cols_mask = df.dtypes == "geometry"
             if len(geometry_cols_mask) == 0 or geometry_cols_mask.sum() == 0:
                 df = pd.DataFrame(df)
-            elif self._geometry_column_name in df.columns[geometry_cols_mask]:
-                # not inplace is awkward, but avoids a recursion error
-                df.set_geometry(self.geometry.name, crs=self.crs, inplace=True)
+            # elif self._geometry_column_name in df.columns[geometry_cols_mask]:
+            # note inplace is awkward, but avoids a recursion error
+            # df.set_geometry(self.geometry.name, crs=self.crs, inplace=True)
 
             return df
 
@@ -1488,6 +1498,10 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
                     f"Please ensure this column from the first DataFrame is not "
                     f"repeated."
                 )
+        elif method == "rename":
+            if self._geometry_column_name not in self.columns:
+                self._geometry_column_name = None
+                # TODO should this downcast, arguably yes
         return self
 
     def dissolve(
