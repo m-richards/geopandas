@@ -44,7 +44,7 @@ class TestDataFrameMethodReturnTypes:
         assert gs.name == name
         assert gs.crs == crs
 
-    def _check_standard_df(self, results, geo_col_name, method=None):
+    def _check_standard_df(self, results, geo_col_name):
         for i in results:
             print(i.columns if isinstance(i, pd.DataFrame) else i.name)
 
@@ -58,24 +58,12 @@ class TestDataFrameMethodReturnTypes:
         # If there is only one geometry column left, returning a gdf is not ambiguous,
         # but if there are 2 geom cols, and non are the set geom col, behaviour is
         # unclear. Therefore opting to return dataframes.
-        # assert type(results[3]) is pd.DataFrame
+        assert type(results[3]) is pd.DataFrame
         # # Exception is if there is only one column in the dataframe, then seems
         # # wrong to return a dataframe. Not implemented as inconsistent with old
         # # __getitem__ behaviour.
-        # assert type(results[4]) is pd.DataFrame
-        # losing geom col still returns gdf - TODO different from logic in text above
-        exceptions_for_now = ["getitem", "apply"]
+        assert type(results[4]) is pd.DataFrame
 
-        if method in exceptions_for_now:
-            assert type(results[3]) is pd.DataFrame
-        else:
-            assert type(results[3]) is GeoDataFrame
-
-        if method in exceptions_for_now:
-            assert type(results[4]) is pd.DataFrame
-        else:
-            assert type(results[4]) is GeoDataFrame
-        # self._check_metadata_gs(results[4], crsgs_osgb)
         assert type(results[5]) is pd.DataFrame
 
     def _check_standard_srs(self, results, geo_col_name):
@@ -99,7 +87,6 @@ class TestDataFrameMethodReturnTypes:
                 df[["value1"]],
             ],
             geo_col_name=set_geom_col_name,
-            method="getitem",
         )
         self._check_standard_srs(
             [df[set_geom_col_name], df["geometry2"], df["value1"]],
@@ -243,7 +230,6 @@ class TestDataFrameMethodReturnTypes:
                 df[["value1"]].apply(lambda x: x),
             ],
             geo_col_name=set_geom_col_name,
-            method="apply",
         )
         self._check_standard_df(
             [
@@ -255,7 +241,6 @@ class TestDataFrameMethodReturnTypes:
                 df[["value1"]].apply(lambda x: x, axis=1),
             ],
             geo_col_name=set_geom_col_name,
-            method="apply",
         )
 
     @pytest.mark.parametrize("set_geom_col_name", ["geometry", "points"])
