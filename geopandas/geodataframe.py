@@ -1447,6 +1447,21 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
 
     @property
     def _constructor(self):
+        def _geodataframe_constructor_with_fallback(
+            data=None, index=None, crs=None, geometry=None, **kwargs
+        ):
+            df = GeoDataFrame(
+                data=data, index=index, crs=crs, geometry=geometry, **kwargs
+            )
+            geometry_cols_mask = df.dtypes == "geometry"
+            if len(geometry_cols_mask) == 0 or geometry_cols_mask.sum() == 0:
+                df = pd.DataFrame(df)
+            elif self._geometry_column_name in df.columns[geometry_cols_mask]:
+                # not inplace is awkward, but avoids a recursion error
+                df.set_geometry(self.geometry.name, crs=self.crs, inplace=True)
+
+            return df
+
         return _geodataframe_constructor_with_fallback
 
     @property
