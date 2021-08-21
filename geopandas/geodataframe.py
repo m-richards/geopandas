@@ -1422,7 +1422,10 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
 
     @doc(pd.DataFrame)
     def apply(self, func, axis=0, raw=False, result_type=None, args=(), **kwargs):
-        result = super().apply(
+        # apply is awkward because _constructor is called without column name
+        # information so _constructor will refer to geometry that isn't there
+        # Need to use dataframe method and upcast to avoid this
+        result = pd.DataFrame(self).apply(
             func, axis=axis, raw=raw, result_type=result_type, args=args, **kwargs
         )
 
