@@ -1463,9 +1463,20 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
             elif isinstance(geometry, str) and isinstance(data, DataFrame):
                 if geometry not in data.columns:
                     geometry = None
-            df = GeoDataFrame(
-                data=data, index=index, crs=crs, geometry=geometry, **kwargs
-            )
+            # STuff like groupby('value2').count()
+            # will replace geometry values with intergers (the counts)
+            # We don't have a mechanism of catching this, so we need to be prepared for
+            # This to fail - reverting to a DataFrame constructor
+            # An alternative is perhaps to develop an internal way of constructing
+            # a GeoDataFrame with a geometry column not set, and not inferred to
+            # geometry and then checking if set_geometry and crs as separate
+            # steps make sense / are legal
+            try:
+                df = GeoDataFrame(
+                    data=data, index=index, crs=crs, geometry=geometry, **kwargs
+                )
+            except TypeError:
+                df = pd.DataFrame(data=data, index=index, **kwargs)
             geometry_cols_mask = df.dtypes == "geometry"
             if len(geometry_cols_mask) == 0 or geometry_cols_mask.sum() == 0:
                 df = pd.DataFrame(df)
