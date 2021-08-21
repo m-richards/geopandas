@@ -24,34 +24,6 @@ from ._decorator import doc
 DEFAULT_GEO_COLUMN_NAME = "geometry"
 
 
-def _geodataframe_constructor_with_fallback(
-    data=None, index=None, crs=None, geometry=None, **kwargs
-):
-    df = GeoDataFrame(data=data, index=index, crs=crs, geometry=geometry, **kwargs)
-    geometry_cols_mask = df.dtypes == "geometry"
-    if len(geometry_cols_mask) == 0 or geometry_cols_mask.sum() == 0:
-        df = pd.DataFrame(df)
-
-    # else:  # -> doing this breaks copy, rename amongst other things
-    #     if df._geometry_column_name not in df.columns:
-    #         df = pd.DataFrame(df)
-
-    # If we can't downcast GeoDataFrames with incorrect columns
-    # if len(geometry_cols_mask) == 0 or geometry_cols_mask.sum() == 0:
-    #     df = pd.DataFrame(df)
-    # elif geometry_cols_mask.sum() == 1:
-    # if there is one geom col, this could be a (Geo)DataFrame or not,
-    # depending on what the geom col is set to.
-    # if len(geometry_cols_mask) == 1:
-    #     # If there is a single geometry column, we set it regardless of
-    #     # name. If there are multiple, the correct geom col should be set
-    #     # by finalize - we don't have enough info here
-    #     geo_col_name = df.dtypes[geometry_cols_mask].index[0]
-    #     df.set_geometry(geo_col_name, inplace=True)
-
-    return df
-
-
 def _ensure_geometry(data, crs=None):
     """
     Ensure the data is of geometry dtype or converted to it.
@@ -1380,15 +1352,6 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
     #
     # Implement pandas methods
     #
-
-    # def copy(self, deep=True):
-    #     df = super().copy(deep=deep)
-    #     # copy can be the first refresh method after a state change,
-    #     so this shouldn't always be a gdf
-    #     if self._geometry_column_name in df.columns:
-    #         # Copy loses metadata, because constructor_ loses metadata
-    #         df = GeoDataFrame(df, geometry=self._geometry_column_name, crs=self.crs)
-    #     return df
 
     def merge(self, *args, **kwargs):
         r"""Merge two ``GeoDataFrame`` objects with a database-style join.
