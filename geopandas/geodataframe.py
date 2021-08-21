@@ -1423,14 +1423,12 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
         ):
             if type(data) is BlockManager:
                 if isinstance(geometry, str) and geometry not in data.items:
-                    geometry = None
-                    crs = None
+                    return pd.DataFrame(data=data, index=index, **kwargs)
             elif isinstance(geometry, str) and isinstance(data, DataFrame):
                 if geometry not in data.columns:
-                    geometry = None
-                    crs = None
-            # STuff like groupby('value2').count()
-            # will replace geometry values with intergers (the counts)
+                    return pd.DataFrame(data=data, index=index, **kwargs)
+            # Stuff like groupby('value2').count()
+            # will replace geometry values with integers (the counts)
             # We don't have a mechanism of catching this, so we need to be prepared for
             # This to fail - reverting to a DataFrame constructor
             # An alternative is perhaps to develop an internal way of constructing
