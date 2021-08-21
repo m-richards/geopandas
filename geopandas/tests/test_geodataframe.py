@@ -1018,12 +1018,26 @@ class TestConstructor:
         # explicitly prevent construction of gdf with repeat geometry column names
         # two columns called "geometry", geom col inferred
         df2 = df.rename(columns={"geom": "geometry"})
-        with pytest.raises(ValueError):
+
+        expected_err = (
+            "GeoDataFrame does not support multiple columns using the "
+            "geometry column name 'geometry'."
+        )
+        with pytest.raises(ValueError, match=expected_err):
             GeoDataFrame(df2)
+
+        expected_err2 = (
+            "GeoDataFrame does not support setting the geometry column where"
+            " the column name is shared by multiple columns."
+        )
+        # This is internally different even though it might appear the same
+        with pytest.raises(ValueError, match=expected_err2):
+            GeoDataFrame(df2, geometry="geometry")
+
         # ensure case is caught when custom geom column name is used
         # two columns called "geom", geom col explicit
         df3 = df.rename(columns={"geometry": "geom"})
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=expected_err2):
             GeoDataFrame(df3, geometry="geom")
 
 

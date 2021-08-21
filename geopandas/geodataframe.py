@@ -147,7 +147,8 @@ class GeoDataFrame(GeoPandasBase, DataFrame):
         # allowed in that case
         # TODO do we want to raise / return normal DataFrame in this case?
         if geometry is None and "geometry" in self.columns:
-            # Check for multiple columns with name "geometry". If there are,
+            # Check for multiple columns with name "geometry" - for inferred case only.
+            # Ordinary case is caught in set geometry. If there are multiples,
             # self["geometry"] is a gdf and constructor gets recursively recalled
             # by pandas internals trying to access this
             if (self.columns == "geometry").sum() > 1:
@@ -310,6 +311,11 @@ class GeoDataFrame(GeoPandasBase, DataFrame):
             level = col
         elif hasattr(col, "ndim") and col.ndim > 1:
             raise ValueError("Must pass array with one dimension only.")
+        elif (frame.columns == col).sum() > 1:
+            raise ValueError(
+                "GeoDataFrame does not support setting the geometry column where "
+                "the column name is shared by multiple columns."
+            )
         else:
             try:
                 level = frame[col]
@@ -317,11 +323,6 @@ class GeoDataFrame(GeoPandasBase, DataFrame):
                 raise ValueError("Unknown column %s" % col)
             except Exception:
                 raise
-            if isinstance(level, DataFrame):
-                raise ValueError(
-                    "GeoDataFrame does not support setting the geometry column where "
-                    "the column name is shared by multiple columns."
-                )
 
             if drop:
                 to_remove = col
