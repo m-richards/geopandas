@@ -5,6 +5,7 @@ from geopandas.testing import assert_geodataframe_equal
 from shapely.geometry import Point
 
 from geopandas import GeoDataFrame, GeoSeries
+import geopandas._compat as compat
 
 
 class TestMerging:
@@ -78,20 +79,33 @@ class TestMerging:
         # Expect that concat should fail gracefully if duplicate column names belonging
         # to geometry columns are introduced.
 
-        expected_err = (
-            "GeoDataFrame does not support setting the geometry column where the "
-            "column name is shared by multiple columns."
-        )
+        if compat.PANDAS_GE_11:
+            expected_err = (
+                "GeoDataFrame does not support setting the geometry column where the "
+                "column name is shared by multiple columns."
+            )
+        else:
+            expected_err = (
+                "GeoDataFrame does not support multiple columns using the"
+                " geometry column name"
+            )
+
         with pytest.raises(ValueError, match=expected_err):
             pd.concat([self.gdf, self.gdf], axis=1)
 
         # Check case is handled if custom geometry column name is used
         df2 = self.gdf.rename_geometry("geom")
         # TODO this is now a really cryptic error message when triggered by concat
-        expected_err2 = (
-            "GeoDataFrame does not support setting the geometry column where the "
-            "column name is shared by multiple columns."
-        )
+        if compat.PANDAS_GE_11:
+            expected_err2 = (
+                "GeoDataFrame does not support setting the geometry column where the "
+                "column name is shared by multiple columns."
+            )
+        else:
+            expected_err2 = (
+                "Concat operation has resulted in multiple columns using the geometry "
+                "column name 'geom'."
+            )
         with pytest.raises(ValueError, match=expected_err2):
             pd.concat([df2, df2], axis=1)
 
