@@ -162,17 +162,10 @@ class TestDataFrameMethodReturnTypes:
         df = self.df.rename_geometry(set_geom_col_name)
         res1 = df[set_geom_col_name].to_frame()
         assert type(res1) is GeoDataFrame
-        if set_geom_col_name == "geometry":  # -> should be set_geom_col_name always
-            self._check_metadata_gdf(res1, geo_col_name=set_geom_col_name)
+        self._check_metadata_gdf(res1, geo_col_name=set_geom_col_name)
         res2 = df["geometry2"].to_frame()
         assert type(res2) is GeoDataFrame
-        # TODO this reflects current behaviour, but we should fix
-        #  GeoSeries._constructor_expanddim so this doesn't happen
-        assert (
-            res2._geometry_column_name == "geometry"
-        )  # -> should be set_geom_col_name
-        assert res2.crs is None  # -> should be self.osgb
-        # also res2.geometry should not crash because geometry isn't set
+        self._check_metadata_gdf(res2, geo_col_name="geometry2", crs=crsgs_osgb)
         assert type(self.df["value1"].to_frame()) is pd.DataFrame
 
     @pytest.mark.parametrize("set_geom_col_name", ["geometry", "points"])
