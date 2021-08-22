@@ -1450,6 +1450,9 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
 
             return df
 
+        if not compat.PANDAS_GE_11:
+            _geodataframe_constructor_with_fallback._from_axes = self._from_axes
+
         return _geodataframe_constructor_with_fallback
 
     @property
