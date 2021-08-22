@@ -115,6 +115,7 @@ class TestSpatialJoin:
 
         exp = expected[op].dropna().copy()
         exp = exp.drop("geometry_y", axis=1).rename(columns={"geometry_x": "geometry"})
+        exp = exp.set_geometry("geometry")
         exp[["df1", "df2"]] = exp[["df1", "df2"]].astype("int64")
         if index == "default-index":
             exp[["index_left", "index_right"]] = exp[
@@ -165,6 +166,7 @@ class TestSpatialJoin:
         elif index == "named-multi-index":
             exp = expected[op].dropna(subset=["df1_ix1"]).copy()
         exp = exp.drop("geometry_y", axis=1).rename(columns={"geometry_x": "geometry"})
+        exp = exp.set_geometry("geometry")
         exp["df1"] = exp["df1"].astype("int64")
         if index == "default-index":
             exp["index_left"] = exp["index_left"].astype("int64")
@@ -270,6 +272,7 @@ class TestSpatialJoin:
         elif index == "named-multi-index":
             exp = expected[op].dropna(subset=["df2_ix1"]).copy()
         exp = exp.drop("geometry_x", axis=1).rename(columns={"geometry_y": "geometry"})
+        exp = exp.set_geometry("geometry")
         exp["df2"] = exp["df2"].astype("int64")
         if index == "default-index":
             exp["index_right"] = exp["index_right"].astype("int64")
