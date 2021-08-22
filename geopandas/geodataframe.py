@@ -1421,14 +1421,18 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
         def _geodataframe_constructor_with_fallback(
             data=None, index=None, crs=crs_default, geometry=geometry_default, **kwargs
         ):
-            if type(data) is BlockManager:
-                if isinstance(geometry, str) and geometry not in data.items:
-                    return pd.DataFrame(data=data, index=index, **kwargs)
-            elif isinstance(geometry, str) and isinstance(data, DataFrame):
-                if geometry not in data.columns:
+            if isinstance(geometry, str):
+
+                if (
+                    (type(data) is BlockManager and geometry not in data.items)
+                    or (isinstance(data, DataFrame) and geometry not in data.columns)
+                    # strictly only found to be an issue on pandas 0.25, <1.0,
+                    # could in theory occur in other places?
+                    or (isinstance(data, dict) and geometry not in data.keys())
+                ):
                     return pd.DataFrame(data=data, index=index, **kwargs)
             # Stuff like groupby('value2').count()
-            # will replace geometry values with integers (the counts)
+            # will replace geometry col values with integers (the counts)
             # We don't have a mechanism of catching this, so we need to be prepared for
             # This to fail - reverting to a DataFrame constructor
             # An alternative is perhaps to develop an internal way of constructing
