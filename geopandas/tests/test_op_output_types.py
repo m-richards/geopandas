@@ -47,42 +47,6 @@ class TestDataFrameMethodReturnTypes:
         assert gs.name == name
         assert gs.crs == crs
 
-    def _check_standard_df(self, results, geo_name, method=None):
-        for i in results:
-            print(i.columns if isinstance(i, pd.DataFrame) else i.name)
-
-        assert type(results[0]) is pd.DataFrame
-        assert type(results[1]) is GeoDataFrame
-        self._check_metadata_gdf(results[1], geo_name=geo_name)
-        assert type(results[2]) is GeoDataFrame
-        self._check_metadata_gdf(results[2], geo_name=geo_name)
-        # Non geometry column is not treated specially, we get a DataFrame
-        # Not sure this is the most desirable behaviour, but it is at least consistent
-        # If there is only one geometry column left, returning a gdf is not ambiguous,
-        # but if there are 2 geom cols, and non are the set geom col, behaviour is
-        # unclear. Therefore opting to return dataframes.
-        # assert type(results[3]) is pd.DataFrame
-        # # Exception is if there is only one column in the dataframe, then seems
-        # # wrong to return a dataframe. Not implemented as inconsistent with old
-        # # __getitem__ behaviour.
-        # assert type(results[4]) is pd.DataFrame
-        # losing geom col still returns gdf - TODO different from logic in text above
-
-        # End goal is to mimic getitem completely, that's not happening right now
-        exceptions_for_now = ["getitem", "apply"]
-
-        if method in exceptions_for_now:
-            assert type(results[3]) is pd.DataFrame
-        else:
-            assert type(results[3]) is GeoDataFrame
-
-        if method in exceptions_for_now:
-            assert type(results[4]) is pd.DataFrame
-        else:
-            assert type(results[4]) is GeoDataFrame
-        # self._check_metadata_gs(results[4], crsgs_osgb)
-        assert type(results[5]) is pd.DataFrame
-
     def _assert_object(self, result, expected_type, geo_name="geometry", crs=crs_wgs):
         """Helper method to make tests easier to read. Checks result is of the expected
         type. If result is a GeoDataFrame or GeoSeries, checks geo_name
