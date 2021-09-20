@@ -164,19 +164,11 @@ class TestDataFrameMethodReturnTypes:
 
     def test_to_frame(self, df):
         geo_name = df.geometry.name
-        # This shouldn't be a special case,
-        # need to update GeoSeries._constructor_expanddim
-        if geo_name == "geometry":
-            self._assert_object(df[geo_name].to_frame(), GeoDataFrame, geo_name)
-        assert df[geo_name].to_frame()._geometry_column_name == "geometry"
+        res1 = df[geo_name].to_frame()
+        self._assert_object(res1, GeoDataFrame, geo_name)
 
         res2 = df["geometry2"].to_frame()
-        # TODO this reflects current behaviour, but we should fix
-        #  GeoSeries._constructor_expanddim so this doesn't happen
-        assert type(res2) is GeoDataFrame
-        assert res2._geometry_column_name == "geometry"  # -> should be geo_name
-        assert res2.crs is None  # -> should be self.osgb
-        # also res2.geometry should not crash because geometry isn't set
+        self._assert_object(res2, GeoDataFrame, "geometry2", crsgs_osgb)
         self._assert_object(df["value1"].to_frame(), pd.DataFrame)
 
     def test_reindex(self, df):
