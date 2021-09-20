@@ -534,7 +534,42 @@ class GeoSeries(GeoPandasBase, Series):
     def _constructor_expanddim(self):
         from geopandas import GeoDataFrame
 
-        return GeoDataFrame
+        geometry_default = self.name
+        crs_default = self.crs
+
+        def expanddim(
+            data=None, index=None, crs=crs_default, geometry=geometry_default, **kwargs
+        ):
+            if isinstance(data, GeoSeries) and data.name is None:
+                # if GeoSeries has no name, we make the geometry name geometry
+                # (instead of 0)
+                data = {"geometry": data}
+            # elif isinstance(data, dict):
+            #     # TODO this might break legitimate cases, need to check where
+            #     #  _constructor_expanddim is used
+            #     (Opted for the try catch below instead, this could be flakey
+            #     if {0,1,2...} are the actual keys?
+            #     # pandas can construct a dict with keys {0,1,2...} where
+            #     # we actually have column names
+            #     data = {k if v.name is None else v.name:v for (k,v) in data.items()}
+            try:
+                df = GeoDataFrame(
+                    data=data, index=index, crs=crs, geometry=geometry, **kwargs
+                )
+            except ValueError as e:
+                print(str(e))
+                if "Unknown column" in str(e):
+                    # Hope stuff is fixed by finalize in whatever context
+                    df = GeoDataFrame(
+                        data=data, index=index, crs=crs, geometry=None, **kwargs
+                    )
+                else:
+                    raise e
+            return df
+
+        expanddim._get_axis_number = GeoDataFrame._get_axis_number
+
+        return expanddim
 
     def _wrapped_pandas_method(self, mtd, *args, **kwargs):
         """Wrap a generic pandas method to ensure it returns a GeoSeries"""
@@ -566,13 +601,6 @@ class GeoSeries(GeoPandasBase, Series):
             if self.crs is not None:
                 result.set_crs(self.crs, inplace=True)
         return result
-
-    def __finalize__(self, other, method=None, **kwargs):
-        """propagate metadata from other to self"""
-        # NOTE: backported from pandas master (upcoming v0.13)
-        for name in self._metadata:
-            object.__setattr__(self, name, getattr(other, name, None))
-        return self
 
     def isna(self):
         """

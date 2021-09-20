@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 from pandas.core.accessor import CachedAccessor
+from pandas.core.internals import BlockManager
 
 from shapely.geometry import mapping, shape
 from shapely.geometry.base import BaseGeometry
@@ -13,7 +14,7 @@ from pyproj import CRS
 
 from geopandas.array import GeometryArray, GeometryDtype, from_shapely, to_wkb, to_wkt
 from geopandas.base import GeoPandasBase, is_geometry_type
-from geopandas.geoseries import GeoSeries
+from geopandas.geoseries import GeoSeries, _geoseries_constructor_with_fallback
 import geopandas.io
 
 from . import _compat as compat
@@ -118,7 +119,8 @@ class GeoDataFrame(GeoPandasBase, DataFrame):
         # allowed in that case
         # TODO do we want to raise / return normal DataFrame in this case?
         if geometry is None and "geometry" in self.columns:
-            # Check for multiple columns with name "geometry". If there are,
+            # Check for multiple columns with name "geometry" - for inferred case only.
+            # Ordinary case is caught in set geometry. If there are multiples,
             # self["geometry"] is a gdf and constructor gets recursively recalled
             # by pandas internals trying to access this
             if (self.columns == "geometry").sum() > 1:
@@ -271,13 +273,21 @@ class GeoDataFrame(GeoPandasBase, DataFrame):
             frame = self
         else:
             frame = self.copy()
+            # if there is no previous self.geometry, self.copy() will downcast
+            if type(frame) == DataFrame:
+                frame = GeoDataFrame(frame)
 
         to_remove = None
         geo_column_name = self._geometry_column_name
         if isinstance(col, (Series, list, np.ndarray, GeometryArray)):
             level = col
-        elif hasattr(col, "ndim") and col.ndim != 1:
+        elif hasattr(col, "ndim") and col.ndim > 1:
             raise ValueError("Must pass array with one dimension only.")
+        elif (frame.columns == col).sum() > 1:
+            raise ValueError(
+                "GeoDataFrame does not support setting the geometry column where "
+                "the column name is shared by multiple columns."
+            )
         else:
             try:
                 level = frame[col]
@@ -285,11 +295,6 @@ class GeoDataFrame(GeoPandasBase, DataFrame):
                 raise ValueError("Unknown column %s" % col)
             except Exception:
                 raise
-            if isinstance(level, DataFrame):
-                raise ValueError(
-                    "GeoDataFrame does not support setting the geometry column where "
-                    "the column name is shared by multiple columns."
-                )
 
             if drop:
                 to_remove = col
@@ -1381,21 +1386,82 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
 
     @doc(pd.DataFrame)
     def apply(self, func, axis=0, raw=False, result_type=None, args=(), **kwargs):
-        result = super().apply(
+        # apply is awkward because _constructor is called without column name
+        # information so _constructor will refer to geometry that isn't there
+        # Need to use dataframe method and upcast to avoid this
+        result = pd.DataFrame(self).apply(
             func, axis=axis, raw=raw, result_type=result_type, args=args, **kwargs
         )
-        if (
-            isinstance(result, GeoDataFrame)
-            and self._geometry_column_name in result.columns
-            and any(isinstance(t, GeometryDtype) for t in result.dtypes)
-        ):
-            if self.crs is not None and result.crs is None:
-                result.set_crs(self.crs, inplace=True)
+
+        if self._geometry_column_name in result.columns:
+            # Reconstruct gdf if it was lost by apply
+            if isinstance(result, GeoDataFrame) is False:
+                # axis=1 apply will split GeometryDType to object, try and cast back
+                try:
+                    _ensure_geometry(result[self._geometry_column_name], crs=self.crs)
+                except TypeError:
+                    pass
+                else:
+                    result = GeoDataFrame(
+                        result, geometry=self._geometry_column_name, crs=self.crs
+                    )
+            else:
+                # this type check seems broad, already raised in GH1849
+                if any(isinstance(t, GeometryDtype) for t in result.dtypes):
+                    result = result.set_geometry(self._geometry_column_name)
+                    if self.crs is not None and result.crs is None:
+                        result.set_crs(self.crs, inplace=True)
         return result
 
     @property
     def _constructor(self):
-        return GeoDataFrame
+        geometry_default = getattr(self, "_geometry_column_name", None)
+        crs_default = getattr(self, "crs")
+
+        def _geodataframe_constructor_with_fallback(
+            data=None, index=None, crs=crs_default, geometry=geometry_default, **kwargs
+        ):
+            if isinstance(geometry, str):
+
+                if (
+                    (type(data) is BlockManager and geometry not in data.items)
+                    or (isinstance(data, DataFrame) and geometry not in data.columns)
+                    # strictly only found to be an issue on pandas 0.25, <1.0,
+                    # could in theory occur in other places?
+                    or (isinstance(data, dict) and geometry not in data.keys())
+                ):
+                    return pd.DataFrame(data=data, index=index, **kwargs)
+            # Stuff like groupby('value2').count()
+            # will replace geometry col values with integers (the counts)
+            # We don't have a mechanism of catching this, so we need to be prepared for
+            # This to fail - reverting to a DataFrame constructor
+            # An alternative is perhaps to develop an internal way of constructing
+            # a GeoDataFrame with a geometry column not set, and not inferred to
+            # geometry and then checking if set_geometry and crs as separate
+            # steps make sense / are legal
+            try:
+                df = GeoDataFrame(
+                    data=data, index=index, crs=crs, geometry=geometry, **kwargs
+                )
+            except TypeError:
+                df = pd.DataFrame(data=data, index=index, **kwargs)
+            geometry_cols_mask = df.dtypes == "geometry"
+            if len(geometry_cols_mask) == 0 or geometry_cols_mask.sum() == 0:
+                df = pd.DataFrame(df)
+            # elif self._geometry_column_name in df.columns[geometry_cols_mask]:
+            # note inplace is awkward, but avoids a recursion error
+            # df.set_geometry(self.geometry.name, crs=self.crs, inplace=True)
+
+            return df
+
+        if not compat.PANDAS_GE_11:
+            _geodataframe_constructor_with_fallback._from_axes = self._from_axes
+
+        return _geodataframe_constructor_with_fallback
+
+    @property
+    def _constructor_sliced(self):
+        return _geoseries_constructor_with_fallback
 
     def __finalize__(self, other, method=None, **kwargs):
         """propagate metadata from other to self"""
@@ -1417,6 +1483,10 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
                     f"Please ensure this column from the first DataFrame is not "
                     f"repeated."
                 )
+        elif method == "rename":
+            if self._geometry_column_name not in self.columns:
+                self._geometry_column_name = None
+                # TODO should this downcast, arguably yes
         return self
 
     def dissolve(
@@ -1608,12 +1678,10 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
 
         exploded_geom = df_copy.geometry.explode().reset_index(level=-1)
         exploded_index = exploded_geom.columns[0]
-
-        df = (
-            df_copy.drop(df_copy._geometry_column_name, axis=1)
-            .join(exploded_geom)
-            .__finalize__(self)
-        )
+        df = GeoDataFrame(
+            df_copy.drop(df_copy._geometry_column_name, axis=1).join(exploded_geom),
+            geometry=self._geometry_column_name,
+        ).__finalize__(self)
 
         # reset to MultiIndex, otherwise df index is only first level of
         # exploded GeoSeries index.
@@ -1623,8 +1691,7 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
         if "__level_1" in df.columns:
             df = df.rename(columns={"__level_1": "level_1"})
 
-        geo_df = df.set_geometry(self._geometry_column_name)
-        return geo_df
+        return df
 
     # overrides the pandas astype method to ensure the correct return type
     def astype(self, dtype, copy=True, errors="raise", **kwargs):
@@ -1640,17 +1707,25 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
         -------
         GeoDataFrame or DataFrame
         """
-        df = super().astype(dtype, copy=copy, errors=errors, **kwargs)
-
+        df = pd.DataFrame(self).astype(dtype, copy=copy, errors=errors, **kwargs)
         try:
             geoms = df[self._geometry_column_name]
             if is_geometry_type(geoms):
                 return geopandas.GeoDataFrame(df, geometry=self._geometry_column_name)
+        # cases where we do not return a GeoDataFrame
         except KeyError:
-            pass
-        # if the geometry column is converted to non-geometries or did not exist
-        # do not return a GeoDataFrame
-        return pd.DataFrame(df)
+            pass  # if the geometry column doesn't exist
+        except TypeError as e:
+            #  if geom col is convert to non geometry
+            # TODO not a robust check
+            if "Input must be valid geometry objects" in str(e) and isinstance(
+                str, geoms.iloc[0]
+            ):
+                pass
+            else:
+                raise e
+
+        return df
 
     def to_postgis(
         self,
