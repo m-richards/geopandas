@@ -488,10 +488,38 @@ class TestConstructor:
         assert s.index is g.index
 
     # GH 1216
-    def test_expanddim(self):
+    @pytest.mark.parametrize("name", [None, "geometry", "Points"])
+    @pytest.mark.parametrize("crs", [None, "epsg:4326"])
+    def test_reset_index(self, name, crs):
         s = GeoSeries(
-            [MultiPoint([(0, 0), (1, 1)]), MultiPoint([(2, 2), (3, 3), (4, 4)])]
+            [MultiPoint([(0, 0), (1, 1)]), MultiPoint([(2, 2), (3, 3), (4, 4)])],
+            name=name,
+            crs=crs,
         )
         s = s.explode()
         df = s.reset_index()
         assert type(df) == GeoDataFrame
+        # name None -> geometry, otherwise name preserved
+        assert df.geometry.name == name if name is not None else "geometry"
+        assert df.crs == s.crs
+
+    @pytest.mark.parametrize("name", [None, "geometry", "Points"])
+    @pytest.mark.parametrize("crs", [None, "epsg:4326"])
+    def test_to_frame(self, name, crs):
+        s = GeoSeries(
+            [MultiPoint([(0, 0), (1, 1)]), MultiPoint([(2, 2), (3, 3), (4, 4)])],
+            name=name,
+            crs=crs,
+        )
+        df = s.to_frame()
+        assert type(df) == GeoDataFrame
+        # name none -> geometry, otherwise name preserved
+        assert df.geometry.name == name if name is not None else "geometry"
+        assert df.crs == s.crs
+
+        # if name is provided to to_frame, it should override
+        df2 = s.to_frame(name="geom")
+        assert type(df) == GeoDataFrame
+        # name none -> geometry, otherwise name preserved
+        assert df2.geometry.name == "geom"
+        assert df2.crs == s.crs
