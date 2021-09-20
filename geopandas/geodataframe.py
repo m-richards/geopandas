@@ -1403,9 +1403,6 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
 
     @property
     def _constructor(self):
-        # TODO what if geometry col doesn't contain geometry anymore
-        # e.g.  groupby('value2').count()
-        # this shouldn't result in a gdf, with a geoseries of integers
         geometry_default = getattr(self, "_geometry_column_name")
         crs_default = getattr(self, "crs")
 
@@ -1414,9 +1411,12 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
         ):
             df = pd.DataFrame(data, index)
             if geometry in df.columns:
-                df = GeoDataFrame(
-                    data=data, index=index, crs=crs, geometry=geometry, **kwargs
-                )
+                if isinstance(df[geometry], pd.DataFrame) > 0:
+                    raise ValueError("got multiple geometry columns...")
+                elif df[geometry].dtype == "geometry":
+                    df = GeoDataFrame(
+                        data=data, index=index, crs=crs, geometry=geometry, **kwargs
+                    )
 
             return df
 
