@@ -23,15 +23,6 @@ from ._decorator import doc
 DEFAULT_GEO_COLUMN_NAME = "geometry"
 
 
-def _geodataframe_constructor_with_fallback(*args, **kwargs):
-    df = GeoDataFrame(*args, **kwargs)
-    geometry_cols_mask = df.dtypes == "geometry"
-    if len(geometry_cols_mask) == 0 or geometry_cols_mask.sum() == 0:
-        df = pd.DataFrame(df)
-
-    return df
-
-
 def _ensure_geometry(data, crs=None):
     """
     Ensure the data is of geometry dtype or converted to it.
@@ -1412,6 +1403,23 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
 
     @property
     def _constructor(self):
+        # TODO what if geometry col doesn't contain geometry anymore
+        # e.g.  groupby('value2').count()
+        # this shouldn't result in a gdf, with a geoseries of integers
+        geometry_default = getattr(self, "_geometry_column_name")
+        crs_default = getattr(self, "crs")
+
+        def _geodataframe_constructor_with_fallback(
+            data=None, index=None, crs=crs_default, geometry=geometry_default, **kwargs
+        ):
+            df = pd.DataFrame(data, index)
+            if geometry in df.columns:
+                df = GeoDataFrame(
+                    data=data, index=index, crs=crs, geometry=geometry, **kwargs
+                )
+
+            return df
+
         return _geodataframe_constructor_with_fallback
 
     @property

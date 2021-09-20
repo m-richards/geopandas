@@ -83,14 +83,6 @@ class TestDataFrameMethodReturnTypes:
         # self._check_metadata_gs(results[4], crsgs_osgb)
         assert type(results[5]) is pd.DataFrame
 
-    def _check_standard_srs(self, results, geo_name):
-        assert type(results[0]) is GeoSeries
-        self._check_metadata_gs(results[0], geo_name)
-        assert type(results[1]) is GeoSeries
-        self._check_metadata_gs(results[1], name="geometry2")
-        assert type(results[2]) is pd.Series
-        assert results[2].name == "value1"
-
     def _assert_object(self, result, expected_type, geo_name="geometry", crs=crs_wgs):
         """Helper method to make tests easier to read. Checks result is of the expected
         type. If result is a GeoDataFrame or GeoSeries, checks geo_name
@@ -128,11 +120,8 @@ class TestDataFrameMethodReturnTypes:
         self._assert_object(df.loc[:, ["value1", "value2"]], pd.DataFrame)
         self._assert_object(df.loc[:, [geo_name, "geometry2"]], GeoDataFrame, geo_name)
         self._assert_object(df.loc[:, [geo_name]], GeoDataFrame, geo_name)
-        self._assert_object(df.loc[:, ["geometry2", "value1"]], GeoDataFrame, None)
-        self._assert_object(df.loc[:, ["geometry2"]], GeoDataFrame, None)
-        # Ideally this would mirror __getitem__ and below would be true
-        # self._assert_object(df.loc[:, ["geometry2", "value1"]], pd.DataFrame)
-        # self._assert_object(df.loc[:, ["geometry2"]], pd.DataFrame)
+        self._assert_object(df.loc[:, ["geometry2", "value1"]], pd.DataFrame)
+        self._assert_object(df.loc[:, ["geometry2"]], pd.DataFrame)
         self._assert_object(df.loc[:, ["value1"]], pd.DataFrame)
         # Series
         self._assert_object(df.loc[:, geo_name], GeoSeries, geo_name)
@@ -144,11 +133,8 @@ class TestDataFrameMethodReturnTypes:
         self._assert_object(df.iloc[:, 0:2], pd.DataFrame)
         self._assert_object(df.iloc[:, 2:4], GeoDataFrame, geo_name)
         self._assert_object(df.iloc[:, [2]], GeoDataFrame, geo_name)
-        self._assert_object(df.iloc[:, [3, 0]], GeoDataFrame, None)
-        self._assert_object(df.iloc[:, [3]], GeoDataFrame, None)
-        # Ideally this would mirror __getitem__ and below would be true
-        # self._assert_object(df.iloc[:, [3, 0]], pd.DataFrame)
-        # self._assert_object(df.iloc[:, [3]], pd.DataFrame)
+        self._assert_object(df.iloc[:, [3, 0]], pd.DataFrame)
+        self._assert_object(df.iloc[:, [3]], pd.DataFrame)
         self._assert_object(df.iloc[:, [0]], pd.DataFrame)
         # Series
         self._assert_object(df.iloc[:, 2], GeoSeries, geo_name)
@@ -178,11 +164,8 @@ class TestDataFrameMethodReturnTypes:
         test_func(df.reindex(columns=["value1", "value2"]), pd.DataFrame)
         test_func(df.reindex(columns=[geo_name, "geometry2"]), GeoDataFrame, geo_name)
         test_func(df.reindex(columns=[geo_name]), GeoDataFrame, geo_name)
-        test_func(df.reindex(columns=["geometry2", "value1"]), GeoDataFrame, None)
-        test_func(df.reindex(columns=["geometry2"]), GeoDataFrame, None)
-        # Ideally this would mirror __getitem__ and below would be true
-        # test_func(df.reindex(columns=["geometry2", "value1"]), pd.DataFrame)
-        # test_func(df.reindex(columns=["geometry2"]), pd.DataFrame)
+        test_func(df.reindex(columns=["geometry2", "value1"]), pd.DataFrame)
+        test_func(df.reindex(columns=["geometry2"]), pd.DataFrame)
         test_func(df.reindex(columns=["value1"]), pd.DataFrame)
 
     def test_drop(self, df):
@@ -192,11 +175,8 @@ class TestDataFrameMethodReturnTypes:
         test_func(df.drop(columns=["value1", "value2"]), GeoDataFrame, geo_name)
         cols = ["value1", "value2", "geometry2"]
         test_func(df.drop(columns=cols), GeoDataFrame, geo_name)
-        test_func(df.drop(columns=[geo_name, "value2"]), GeoDataFrame, None)
-        test_func(df.drop(columns=["value1", "value2", geo_name]), GeoDataFrame, None)
-        # Ideally this would mirror __getitem__ and below would be true
-        # test_func(df.drop(columns=[geo_name, "value2"]), pd.DataFrame)
-        # test_func(df.drop(columns=["value1", "value2", geo_name]), pd.DataFrame)
+        test_func(df.drop(columns=[geo_name, "value2"]), pd.DataFrame)
+        test_func(df.drop(columns=["value1", "value2", geo_name]), pd.DataFrame)
         test_func(df.drop(columns=["geometry2", "value2", geo_name]), pd.DataFrame)
 
     def test_apply(self, df):
