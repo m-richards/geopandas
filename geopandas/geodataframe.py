@@ -1442,12 +1442,8 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
         """propagate metadata from other to self"""
         self = super().__finalize__(other, method=method, **kwargs)
 
-        # merge operation: using metadata of the left object
-        if method == "merge":
-            for name in self._metadata:
-                object.__setattr__(self, name, getattr(other.left, name, None))
         # concat operation: using metadata of the first object
-        elif method == "concat":
+        if method == "concat":
             # TODO would be we be better off binding these as properties
             #  on GeoSeries for this purpose?
             gseries_keymapping = {"_crs": "crs", "_geometry_column_name": "name"}
@@ -1679,6 +1675,8 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
         return df
 
     # overrides the pandas astype method to ensure the correct return type
+    # NOTE: if NDFrame.astype called _constructor, we could remote this
+    # method overload.
     def astype(self, dtype, copy=True, errors="raise", **kwargs):
         """
         Cast a pandas object to a specified dtype ``dtype``.
