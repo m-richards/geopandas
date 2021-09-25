@@ -822,14 +822,8 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
         if na not in ["null", "drop", "keep"]:
             raise ValueError("Unknown na method {0}".format(na))
 
-        if self._geometry_column_name not in self:
-            raise AttributeError(
-                "No geometry data set (expected in"
-                " column '%s')." % self._geometry_column_name
-            )
-
         ids = np.array(self.index, copy=False)
-        geometries = np.array(self[self._geometry_column_name], copy=False)
+        geometries = np.array(self.geometry, copy=False)
 
         if not self.columns.is_unique:
             raise ValueError("GeoDataFrame cannot contain duplicated column names.")
