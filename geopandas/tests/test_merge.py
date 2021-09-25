@@ -87,9 +87,14 @@ class TestMerging:
 
         # Check case is handled if custom geometry column name is used
         df2 = self.gdf.rename_geometry("geom")
+        # TODO can we reinstate this more specific errorerror?
+        # expected_err2 = (
+        #     "Concat operation has resulted in multiple columns using the geometry "
+        #     "column name 'geom'."
+        # )
         expected_err2 = (
-            "Concat operation has resulted in multiple columns using the geometry "
-            "column name 'geom'."
+            "GeoDataFrame does not support multiple columns using the geometry"
+            " column name 'geom'"
         )
         with pytest.raises(ValueError, match=expected_err2):
             pd.concat([df2, df2], axis=1)

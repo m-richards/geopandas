@@ -1409,14 +1409,26 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
         def _geodataframe_constructor_with_fallback(
             data=None, index=None, crs=crs_default, geometry=geometry_default, **kwargs
         ):
-            df = pd.DataFrame(data, index)
+            df = pd.DataFrame(data, index)  # TODO inefficient if not used?
             if geometry in df.columns:
-                if isinstance(df[geometry], pd.DataFrame) > 0:
-                    raise ValueError("got multiple geometry columns...")
+                geo_col = df[geometry]
+                if isinstance(geo_col, DataFrame):
+                    # TODO is there a case where geo_col is a DataFrame of non geo
+                    #  cols to handle gracefully?
+                    # TODO this is a less specific error for concat duplicates
+                    # can we fudge a finalize call to get a better error?
+                    raise ValueError(
+                        "GeoDataFrame does not support multiple columns"
+                        f" using the geometry column name '{geometry}'"
+                    )
+
                 elif df[geometry].dtype == "geometry":
                     df = GeoDataFrame(
-                        data=data, index=index, crs=crs, geometry=geometry, **kwargs
+                        data=data, index=index, crs=crs, geometry=None, **kwargs
                     )
+                    # Note we cannot supply in constructor or use set_geometry, as
+                    # cached sindex on slices will be reset
+                    df._geometry_column_name = geometry
 
             return df
 
