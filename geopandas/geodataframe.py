@@ -1315,23 +1315,6 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
         """
         return self.geometry.estimate_utm_crs(datum_name=datum_name)
 
-    def __getitem__(self, key):
-        """
-        If the result is a column containing only 'geometry', return a
-        GeoSeries. If it's a DataFrame with a 'geometry' column, return a
-        GeoDataFrame.
-        """
-        result = super().__getitem__(key)
-        geo_col = self._geometry_column_name
-        if isinstance(result, Series) and isinstance(result.dtype, GeometryDtype):
-            result.__class__ = GeoSeries
-        elif isinstance(result, DataFrame) and geo_col in result:
-            result.__class__ = GeoDataFrame
-            result._geometry_column_name = geo_col
-        elif isinstance(result, DataFrame) and geo_col not in result:
-            result.__class__ = DataFrame
-        return result
-
     def __setitem__(self, key, value):
         """
         Overwritten to preserve CRS of GeometryArray in cases like
