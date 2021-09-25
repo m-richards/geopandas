@@ -1334,37 +1334,6 @@ box': (2.0, 1.0, 2.0, 1.0)}], 'bbox': (1.0, 1.0, 2.0, 2.0)}
     # Implement pandas methods
     #
 
-    def merge(self, *args, **kwargs):
-        r"""Merge two ``GeoDataFrame`` objects with a database-style join.
-
-        Returns a ``GeoDataFrame`` if a geometry column is present; otherwise,
-        returns a pandas ``DataFrame``.
-
-        Returns
-        -------
-        GeoDataFrame or DataFrame
-
-        Notes
-        -----
-        The extra arguments ``*args`` and keyword arguments ``**kwargs`` are
-        passed to DataFrame.merge.
-
-        Reference
-        ---------
-        https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas\
-        .DataFrame.merge.html
-
-        """
-        result = DataFrame.merge(self, *args, **kwargs)
-        geo_col = self._geometry_column_name
-        if isinstance(result, DataFrame) and geo_col in result:
-            result.__class__ = GeoDataFrame
-            result.crs = self.crs
-            result._geometry_column_name = geo_col
-        elif isinstance(result, DataFrame) and geo_col not in result:
-            result.__class__ = DataFrame
-        return result
-
     @doc(pd.DataFrame)
     def apply(self, func, axis=0, raw=False, result_type=None, args=(), **kwargs):
         result = super().apply(
