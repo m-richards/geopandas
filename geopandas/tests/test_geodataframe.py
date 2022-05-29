@@ -2,6 +2,8 @@ import json
 import os
 import shutil
 import tempfile
+
+from geopandas.base import is_geometry_type
 from packaging.version import Version
 
 import numpy as np
@@ -1258,3 +1260,24 @@ def test_geodataframe_crs():
     gdf = GeoDataFrame(columns=["geometry"])
     gdf.crs = "IGNF:ETRS89UTM28"
     assert gdf.crs.to_authority() == ("IGNF", "ETRS89UTM28")
+
+
+def test_setitem_new_index(dfs):
+    # This explicitly tests behaviour used in test_plotting::test_empty_geometry
+    gdf = dfs[0].copy()
+
+    gdf.loc[3, "geometry"] = None
+    assert is_geometry_type(gdf.geometry)
+    # internally two blockmanagers are concatenated here
+    gdf.loc[4] = [1, None]
+    assert is_geometry_type(gdf.geometry)
+
+    # behaviour with non default geom col name
+    gdf = dfs[0].rename_geometry("points")
+    gdf.loc[3, "points"] = None
+    assert is_geometry_type(gdf.geometry)
+
+    gdf.loc[4] = [1, None]
+    # TODO this is inconsistent with above, due to ensure_geometry call to column
+    #  `geometry`in gdf._constructor by default
+    assert not is_geometry_type(gdf.geometry)
