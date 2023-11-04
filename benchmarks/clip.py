@@ -4,8 +4,8 @@ from shapely.geometry import box
 
 class Bench:
     def setup(self, *args):
-        world = read_file(geodatasets.get_path("naturalearth_lowres"))
-        capitals = read_file(geodatasets.get_path("naturalearth_cities"))
+        world = read_file(naturalearth_lowres)
+        capitals = read_file(naturalearth_cities)
         self.bounds = [box(*geom.bounds) for geom in world.geometry]
         self.points = capitals
 

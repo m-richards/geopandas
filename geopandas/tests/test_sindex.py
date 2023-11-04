@@ -846,10 +846,12 @@ class TestShapelyInterface:
             ("touches", (2, 0)),
         ],
     )
-    def test_integration_natural_earth(self, predicate, expected_shape):
+    def test_integration_natural_earth(
+        self, predicate, expected_shape, naturalearth_lowres, naturalearth_cities
+    ):
         """Tests output sizes for the naturalearth datasets."""
-        world = read_file(geodatasets.get_path("naturalearth_lowres"))
-        capitals = read_file(geodatasets.get_path("naturalearth_cities"))
+        world = read_file(naturalearth_lowres)
+        capitals = read_file(naturalearth_cities)
 
         res = world.sindex.query(capitals.geometry, predicate)
         assert res.shape == expected_shape

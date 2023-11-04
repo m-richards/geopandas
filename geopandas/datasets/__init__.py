@@ -22,7 +22,7 @@
 #
 #     Examples
 #     --------
-#     >>> geodatasets.get_path("naturalearth_lowres")  # doctest: +SKIP
+#     >>> naturalearth_lowres  # doctest: +SKIP
 #     '.../python3.8/site-packages/geopandas/datasets/\
 # naturalearth_lowres/naturalearth_lowres.shp'
 #

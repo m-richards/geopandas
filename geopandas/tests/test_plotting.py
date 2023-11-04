@@ -1061,66 +1061,76 @@ class TestNonuniformGeometryPlotting:
         #     )
 
 
-class TestGeographicAspect:
-    def setup_class(self):
-        pth = get_path("naturalearth_lowres")
-        df = read_file(pth)
-        self.north = df.loc[df.continent == "North America"]
-        self.north_proj = self.north.to_crs("ESRI:102008")
-        bounds = self.north.total_bounds
-        y_coord = np.mean([bounds[1], bounds[3]])
-        self.exp = 1 / np.cos(y_coord * np.pi / 180)
+@pytest.fixture(scope="module")
+def north(naturalearth_lowres):
+    df = read_file(naturalearth_lowres)
+    yield df.loc[df.continent == "North America"]
 
-    def test_auto(self):
-        ax = self.north.geometry.plot()
-        assert ax.get_aspect() == self.exp
-        ax2 = self.north_proj.geometry.plot()
+
+@pytest.fixture(scope="module")
+def north_proj(north) -> GeoDataFrame:
+    yield north.to_crs("ESRI:102008")
+
+
+@pytest.fixture(scope="module")
+def expected_aspect(north):
+    bounds = north.total_bounds
+    y_coord = np.mean([bounds[1], bounds[3]])
+    exp = 1 / np.cos(y_coord * np.pi / 180)
+    yield exp
+
+
+class TestGeographicAspect:
+    def test_auto(self, north, north_proj, expected_aspect):
+        ax = north.geometry.plot()
+        assert ax.get_aspect() == expected_aspect
+        ax2 = north_proj.geometry.plot()
         assert ax2.get_aspect() in ["equal", 1.0]
-        ax = self.north.plot()
-        assert ax.get_aspect() == self.exp
-        ax2 = self.north_proj.plot()
+        ax = north.plot()
+        assert ax.get_aspect() == expected_aspect
+        ax2 = north_proj.plot()
         assert ax2.get_aspect() in ["equal", 1.0]
-        ax3 = self.north.plot("pop_est")
-        assert ax3.get_aspect() == self.exp
-        ax4 = self.north_proj.plot("pop_est")
+        ax3 = north.plot("pop_est")
+        assert ax3.get_aspect() == expected_aspect
+        ax4 = north_proj.plot("pop_est")
         assert ax4.get_aspect() in ["equal", 1.0]
 
-    def test_manual(self):
-        ax = self.north.geometry.plot(aspect="equal")
+    def test_manual(self, north, north_proj):
+        ax = north.geometry.plot(aspect="equal")
         assert ax.get_aspect() in ["equal", 1.0]
-        self.north.geometry.plot(ax=ax, aspect=None)
+        north.geometry.plot(ax=ax, aspect=None)
         assert ax.get_aspect() in ["equal", 1.0]
-        ax2 = self.north.geometry.plot(aspect=0.5)
+        ax2 = north.geometry.plot(aspect=0.5)
         assert ax2.get_aspect() == 0.5
-        self.north.geometry.plot(ax=ax2, aspect=None)
+        north.geometry.plot(ax=ax2, aspect=None)
         assert ax2.get_aspect() == 0.5
-        ax3 = self.north_proj.geometry.plot(aspect=0.5)
+        ax3 = north_proj.geometry.plot(aspect=0.5)
         assert ax3.get_aspect() == 0.5
-        self.north_proj.geometry.plot(ax=ax3, aspect=None)
+        north_proj.geometry.plot(ax=ax3, aspect=None)
         assert ax3.get_aspect() == 0.5
-        ax = self.north.plot(aspect="equal")
+        ax = north.plot(aspect="equal")
         assert ax.get_aspect() in ["equal", 1.0]
-        self.north.plot(ax=ax, aspect=None)
+        north.plot(ax=ax, aspect=None)
         assert ax.get_aspect() in ["equal", 1.0]
-        ax2 = self.north.plot(aspect=0.5)
+        ax2 = north.plot(aspect=0.5)
         assert ax2.get_aspect() == 0.5
-        self.north.plot(ax=ax2, aspect=None)
+        north.plot(ax=ax2, aspect=None)
         assert ax2.get_aspect() == 0.5
-        ax3 = self.north_proj.plot(aspect=0.5)
+        ax3 = north_proj.plot(aspect=0.5)
         assert ax3.get_aspect() == 0.5
-        self.north_proj.plot(ax=ax3, aspect=None)
+        north_proj.plot(ax=ax3, aspect=None)
         assert ax3.get_aspect() == 0.5
-        ax = self.north.plot("pop_est", aspect="equal")
+        ax = north.plot("pop_est", aspect="equal")
         assert ax.get_aspect() in ["equal", 1.0]
-        self.north.plot("pop_est", ax=ax, aspect=None)
+        north.plot("pop_est", ax=ax, aspect=None)
         assert ax.get_aspect() in ["equal", 1.0]
-        ax2 = self.north.plot("pop_est", aspect=0.5)
+        ax2 = north.plot("pop_est", aspect=0.5)
         assert ax2.get_aspect() == 0.5
-        self.north.plot("pop_est", ax=ax2, aspect=None)
+        north.plot("pop_est", ax=ax2, aspect=None)
         assert ax2.get_aspect() == 0.5
-        ax3 = self.north_proj.plot("pop_est", aspect=0.5)
+        ax3 = north_proj.plot("pop_est", aspect=0.5)
         assert ax3.get_aspect() == 0.5
-        self.north_proj.plot("pop_est", ax=ax3, aspect=None)
+        north_proj.plot("pop_est", ax=ax3, aspect=None)
         assert ax3.get_aspect() == 0.5
 
 

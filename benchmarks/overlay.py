@@ -10,8 +10,8 @@ class Countries:
     ]
 
     def setup(self, *args):
-        world = read_file(geodatasets.get_path("naturalearth_lowres"))
-        capitals = read_file(geodatasets.get_path("naturalearth_cities"))
+        world = read_file(naturalearth_lowres)
+        capitals = read_file(naturalearth_cities)
         countries = world[["geometry", "name"]]
         countries = countries.to_crs("+init=epsg:3395")[countries.name != "Antarctica"]
         capitals = capitals.to_crs("+init=epsg:3395")

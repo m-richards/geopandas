@@ -548,21 +548,14 @@ class TestSpatialJoinNYBB:
         assert "BoroCode_left" in result.columns
 
 
-class TestSpatialJoinNaturalEarth:
-    def setup_method(self):
-        world_path = geodatasets.get_path("naturalearth_lowres")
-        cities_path = geodatasets.get_path("naturalearth_cities")
-        self.world = read_file(world_path)
-        self.cities = read_file(cities_path)
-
-    def test_sjoin_inner(self):
-        # GH637
-        countries = self.world[["geometry", "name"]]
-        countries = countries.rename(columns={"name": "country"})
-        cities_with_country = sjoin(
-            self.cities, countries, how="inner", predicate="intersects"
-        )
-        assert cities_with_country.shape == (213, 4)
+def test_sjoin_inner(naturalearth_lowres, naturalearth_cities):
+    # GH637
+    countries = read_file(naturalearth_lowres)[["geometry", "name"]]
+    countries = countries.rename(columns={"name": "country"})
+    cities_with_country = sjoin(
+        read_file(naturalearth_cities), countries, how="inner", predicate="intersects"
+    )
+    assert cities_with_country.shape == (213, 4)
 
 
 class TestNearest:
@@ -873,10 +866,10 @@ class TestNearest:
         assert_geodataframe_equal(expected_gdf, joined)
 
     @pytest.mark.filterwarnings("ignore:Geometry is in a geographic CRS")
-    def test_sjoin_nearest_inner(self):
+    def test_sjoin_nearest_inner(self, naturalearth_lowres, naturalearth_cities):
         # check equivalency of left and inner join
-        countries = read_file(geodatasets.get_path("naturalearth_lowres"))
-        cities = read_file(geodatasets.get_path("naturalearth_cities"))
+        countries = read_file(naturalearth_lowres)
+        cities = read_file(naturalearth_cities)
         countries = countries[["geometry", "name"]].rename(columns={"name": "country"})
 
         # default: inner and left give the same result

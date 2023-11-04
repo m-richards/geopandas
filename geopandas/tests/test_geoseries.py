@@ -6,7 +6,6 @@ import shutil
 import tempfile
 import warnings
 
-import geodatasets
 import numpy as np
 from numpy.testing import assert_array_equal
 import pandas as pd
@@ -320,9 +319,9 @@ class TestSeries:
     def test_to_wkt(self):
         assert_series_equal(pd.Series([self.t1.wkt, self.sq.wkt]), self.g1.to_wkt())
 
-    def test_clip(self):
-        left = read_file(geodatasets.get_path("naturalearth_cities"))
-        world = read_file(geodatasets.get_path("naturalearth_lowres"))
+    def test_clip(self, naturalearth_lowres, naturalearth_cities):
+        left = read_file(naturalearth_cities)
+        world = read_file(naturalearth_lowres)
         south_america = world[world["continent"] == "South America"]
 
         expected = clip(left.geometry, south_america)

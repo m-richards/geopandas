@@ -779,9 +779,9 @@ def test_read_file_filtered_rows_invalid(engine):
         read_file(geodatasets.get_path("nybb"), rows="not_a_slice", engine=engine)
 
 
-def test_read_file__ignore_geometry(engine):
+def test_read_file__ignore_geometry(engine, naturalearth_lowres):
     pdf = geopandas.read_file(
-        geodatasets.get_path("naturalearth_lowres"),
+        naturalearth_lowres,
         ignore_geometry=True,
         engine=engine,
     )
@@ -789,20 +789,20 @@ def test_read_file__ignore_geometry(engine):
     assert isinstance(pdf, pd.DataFrame) and not isinstance(pdf, geopandas.GeoDataFrame)
 
 
-def test_read_file__ignore_all_fields(engine):
+def test_read_file__ignore_all_fields(engine, naturalearth_lowres):
     skip_pyogrio_not_supported(engine)  # pyogrio has "columns" keyword instead
     gdf = geopandas.read_file(
-        geodatasets.get_path("naturalearth_lowres"),
+        naturalearth_lowres,
         ignore_fields=["pop_est", "continent", "name", "iso_a3", "gdp_md_est"],
         engine="fiona",
     )
     assert gdf.columns.tolist() == ["geometry"]
 
 
-def test_read_file__where_filter(engine):
+def test_read_file__where_filter(engine, naturalearth_lowres):
     if FIONA_GE_19 or engine == "pyogrio":
         gdf = geopandas.read_file(
-            geodatasets.get_path("naturalearth_lowres"),
+            naturalearth_lowres,
             where="continent='Africa'",
             engine=engine,
         )
@@ -810,17 +810,17 @@ def test_read_file__where_filter(engine):
     else:
         with pytest.raises(NotImplementedError):
             geopandas.read_file(
-                geodatasets.get_path("naturalearth_lowres"),
+                naturalearth_lowres,
                 where="continent='Africa'",
                 engine="fiona",
             )
 
 
 @PYOGRIO_MARK
-def test_read_file__columns():
+def test_read_file__columns(naturalearth_lowres):
     # TODO: this is only support for pyogrio, but we could mimic it for fiona as well
     gdf = geopandas.read_file(
-        geodatasets.get_path("naturalearth_lowres"),
+        naturalearth_lowres,
         columns=["name", "pop_est"],
         engine="pyogrio",
     )
@@ -847,11 +847,13 @@ def test_read_file_filtered_with_gdf_boundary(df_nybb, engine):
     assert filtered_df_shape == (2, 5)
 
 
-def test_read_file_filtered_with_gdf_boundary__mask(df_nybb, engine):
+def test_read_file_filtered_with_gdf_boundary__mask(
+    engine, naturalearth_lowres, naturalearth_cities
+):
     skip_pyogrio_not_supported(engine)
-    gdf_mask = geopandas.read_file(geodatasets.get_path("naturalearth_lowres"))
+    gdf_mask = geopandas.read_file(naturalearth_lowres)
     gdf = geopandas.read_file(
-        geodatasets.get_path("naturalearth_cities"),
+        naturalearth_cities,
         mask=gdf_mask[gdf_mask.continent == "Africa"],
         engine=engine,
     )

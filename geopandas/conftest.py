@@ -1,7 +1,29 @@
 import pytest
 import geopandas
+from importlib import resources
+from pathlib import Path
 
 
 @pytest.fixture(autouse=True)
 def add_geopandas(doctest_namespace):
     doctest_namespace["geopandas"] = geopandas
+
+
+@pytest.fixture(scope="session")
+def naturalearth_lowres() -> Path:
+    ref = (
+        resources.files("geopandas.datasets.naturalearth_lowres")
+        / "naturalearth_lowres.shp"
+    )
+    with resources.as_file(ref) as path:
+        yield path
+
+
+@pytest.fixture(scope="session")
+def naturalearth_cities() -> Path:
+    ref = (
+        resources.files("geopandas.datasets.naturalearth_cities")
+        / "naturalearth_cities.shp"
+    )
+    with resources.as_file(ref) as path:
+        yield path
