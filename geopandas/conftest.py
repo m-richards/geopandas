@@ -19,7 +19,7 @@ def naturalearth_lowres() -> Path:
         / "naturalearth_lowres.shp"
     )
     with resources.as_file(ref) as path:
-        yield path
+        return path
 
 
 @pytest.fixture(scope="session")
@@ -29,7 +29,7 @@ def naturalearth_cities() -> Path:
         / "naturalearth_cities.shp"
     )
     with resources.as_file(ref) as path:
-        yield path
+        return path
 
 
 @pytest.fixture(scope="session")

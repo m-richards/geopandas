@@ -882,10 +882,10 @@ def test_parquet_read_partitioned_dataset(tmpdir, naturalearth_lowres):
     assert_geodataframe_equal(result, df)
 
 
-def test_parquet_read_partitioned_dataset_fsspec(tmpdir):
+def test_parquet_read_partitioned_dataset_fsspec(tmpdir, naturalearth_lowres):
     fsspec = pytest.importorskip("fsspec")
 
-    df = read_file(get_path("naturalearth_lowres"))
+    df = read_file(get_path("nybb"))
 
     # manually create partitioned dataset
     memfs = fsspec.filesystem("memory")

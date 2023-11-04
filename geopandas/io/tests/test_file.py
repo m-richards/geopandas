@@ -654,11 +654,11 @@ def test_read_file_tempfile(engine):
     temp.close()
 
 
-def test_read_binary_file_fsspec(engine):
+def test_read_binary_file_fsspec(engine, nybb_zipped):
     fsspec = pytest.importorskip("fsspec")
     # Remove the zip scheme so fsspec doesn't open as a zipped file,
     # instead we want to read as bytes and let fiona decode it.
-    path = geodatasets.get_path("nybb")[6:]
+    path = nybb_zipped[6:]
     with fsspec.open(path, "rb") as f:
         gdf = read_file(f, engine=engine)
         assert isinstance(gdf, geopandas.GeoDataFrame)
