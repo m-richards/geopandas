@@ -1,6 +1,7 @@
 import math
 from typing import Sequence
 
+import geodatasets
 import numpy as np
 import pandas as pd
 import shapely
@@ -365,7 +366,7 @@ class TestSpatialJoin:
 
 class TestSpatialJoinNYBB:
     def setup_method(self):
-        nybb_filename = geopandas.datasets.get_path("nybb")
+        nybb_filename = geodatasets.get_path("nybb")
         self.polydf = read_file(nybb_filename)
         self.crs = self.polydf.crs
         N = 20
@@ -537,7 +538,7 @@ class TestSpatialJoinNYBB:
         assert sjoin(empty, self.pointdf, how="left", predicate=predicate).empty
 
     def test_empty_sjoin_return_duplicated_columns(self):
-        nybb = geopandas.read_file(geopandas.datasets.get_path("nybb"))
+        nybb = geopandas.read_file(geodatasets.get_path("nybb"))
         nybb2 = nybb.copy()
         nybb2.geometry = nybb2.translate(200000)  # to get non-overlapping
 
@@ -549,8 +550,8 @@ class TestSpatialJoinNYBB:
 
 class TestSpatialJoinNaturalEarth:
     def setup_method(self):
-        world_path = geopandas.datasets.get_path("naturalearth_lowres")
-        cities_path = geopandas.datasets.get_path("naturalearth_cities")
+        world_path = geodatasets.get_path("naturalearth_lowres")
+        cities_path = geodatasets.get_path("naturalearth_cities")
         self.world = read_file(world_path)
         self.cities = read_file(cities_path)
 
@@ -874,8 +875,8 @@ class TestNearest:
     @pytest.mark.filterwarnings("ignore:Geometry is in a geographic CRS")
     def test_sjoin_nearest_inner(self):
         # check equivalency of left and inner join
-        countries = read_file(geopandas.datasets.get_path("naturalearth_lowres"))
-        cities = read_file(geopandas.datasets.get_path("naturalearth_cities"))
+        countries = read_file(geodatasets.get_path("naturalearth_lowres"))
+        cities = read_file(geodatasets.get_path("naturalearth_cities"))
         countries = countries[["geometry", "name"]].rename(columns={"name": "country"})
 
         # default: inner and left give the same result

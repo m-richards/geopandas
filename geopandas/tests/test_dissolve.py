@@ -1,5 +1,6 @@
 import warnings
 
+import geodatasets
 import numpy as np
 import pandas as pd
 
@@ -15,7 +16,7 @@ from geopandas.testing import assert_geodataframe_equal, geom_almost_equals
 
 @pytest.fixture
 def nybb_polydf():
-    nybb_filename = geopandas.datasets.get_path("nybb")
+    nybb_filename = geodatasets.get_path("nybb")
     nybb_polydf = read_file(nybb_filename)
     nybb_polydf = nybb_polydf[["geometry", "BoroName", "BoroCode"]]
     nybb_polydf = nybb_polydf.rename(columns={"geometry": "myshapes"})

@@ -1,12 +1,13 @@
 import random
 
+import geodatasets
 import numpy as np
 import pandas as pd
 import pyproj
 import pytest
 from shapely.geometry import Point, Polygon, LineString
 
-from geopandas import GeoSeries, GeoDataFrame, points_from_xy, datasets, read_file
+from geopandas import GeoSeries, GeoDataFrame, points_from_xy, read_file
 from geopandas.array import from_shapely, from_wkb, from_wkt, GeometryArray
 from geopandas.testing import assert_geodataframe_equal
 
@@ -416,7 +417,7 @@ class TestGeometryArrayCRS:
             df.crs = 4326
 
     def test_read_file(self):
-        nybb_filename = datasets.get_path("nybb")
+        nybb_filename = geodatasets.get_path("nybb")
         df = read_file(nybb_filename)
         assert df.crs == pyproj.CRS(2263)
         assert df.geometry.crs == pyproj.CRS(2263)

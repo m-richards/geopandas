@@ -17,7 +17,7 @@ from shapely.geometry import box, Point, MultiPolygon
 import geopandas
 from geopandas import GeoDataFrame, read_file, read_parquet, read_feather
 from geopandas.array import to_wkb
-from geopandas.datasets import get_path
+from geodatasets import get_path
 from geopandas.io.arrow import (
     SUPPORTED_VERSIONS,
     _create_metadata,

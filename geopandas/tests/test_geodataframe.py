@@ -3,6 +3,7 @@ import os
 import shutil
 import tempfile
 
+import geodatasets
 import numpy as np
 import pandas as pd
 
@@ -50,7 +51,7 @@ class TestDataFrame:
     def setup_method(self):
         N = 10
 
-        nybb_filename = geopandas.datasets.get_path("nybb")
+        nybb_filename = geodatasets.get_path("nybb")
         self.df = read_file(nybb_filename)
         self.tempdir = tempfile.mkdtemp()
         self.crs = "epsg:4326"
@@ -590,7 +591,7 @@ class TestDataFrame:
 
     def test_from_features(self):
         fiona = pytest.importorskip("fiona")
-        nybb_filename = geopandas.datasets.get_path("nybb")
+        nybb_filename = geodatasets.get_path("nybb")
         with fiona.open(nybb_filename) as f:
             features = list(f)
             crs = f.crs_wkt
@@ -970,8 +971,8 @@ class TestDataFrame:
         Basic test for availability of the GeoDataFrame method. Other
         sjoin tests are located in /tools/tests/test_sjoin.py
         """
-        left = read_file(geopandas.datasets.get_path("naturalearth_cities"))
-        right = read_file(geopandas.datasets.get_path("naturalearth_lowres"))
+        left = read_file(geodatasets.get_path("naturalearth_cities"))
+        right = read_file(geodatasets.get_path("naturalearth_lowres"))
 
         expected = geopandas.sjoin(left, right, how=how, predicate=predicate)
         result = left.sjoin(right, how=how, predicate=predicate)
@@ -985,8 +986,8 @@ class TestDataFrame:
         Basic test for availability of the GeoDataFrame method. Other
         sjoin tests are located in /tools/tests/test_sjoin.py
         """
-        left = read_file(geopandas.datasets.get_path("naturalearth_cities"))
-        right = read_file(geopandas.datasets.get_path("naturalearth_lowres"))
+        left = read_file(geodatasets.get_path("naturalearth_cities"))
+        right = read_file(geodatasets.get_path("naturalearth_lowres"))
 
         expected = geopandas.sjoin_nearest(
             left, right, how=how, max_distance=max_distance, distance_col=distance_col
@@ -1001,8 +1002,8 @@ class TestDataFrame:
         Basic test for availability of the GeoDataFrame method. Other
         clip tests are located in /tools/tests/test_clip.py
         """
-        left = read_file(geopandas.datasets.get_path("naturalearth_cities"))
-        world = read_file(geopandas.datasets.get_path("naturalearth_lowres"))
+        left = read_file(geodatasets.get_path("naturalearth_cities"))
+        world = read_file(geodatasets.get_path("naturalearth_lowres"))
         south_america = world[world["continent"] == "South America"]
 
         expected = geopandas.clip(left, south_america)
@@ -1387,7 +1388,7 @@ class TestConstructor:
         assert gdf.geometry.name == ("geometry", "", "")
 
     def test_assign_cols_using_index(self):
-        nybb_filename = geopandas.datasets.get_path("nybb")
+        nybb_filename = geodatasets.get_path("nybb")
         df = read_file(nybb_filename)
         other_df = pd.DataFrame({"foo": range(5), "bar": range(5)})
         expected = pd.concat([df, other_df], axis=1)

@@ -1,10 +1,11 @@
+import geodatasets
 import pytest
 import numpy
 import geopandas
 
 from geopandas.tools._random import uniform
 
-multipolygons = geopandas.read_file(geopandas.datasets.get_path("nybb")).geometry
+multipolygons = geopandas.read_file(geodatasets.get_path("nybb")).geometry
 polygons = multipolygons.explode(ignore_index=True).geometry
 multilinestrings = multipolygons.boundary
 linestrings = polygons.boundary

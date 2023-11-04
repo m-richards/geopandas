@@ -21,6 +21,8 @@ from geopandas.io.file import _detect_driver, _EXTENSION_TO_DRIVER
 from geopandas.testing import assert_geodataframe_equal, assert_geoseries_equal
 from geopandas.tests.util import PACKAGE_DIR, validate_boro_df
 
+import geodatasets
+
 try:
     import pyogrio
 
@@ -66,7 +68,7 @@ def skip_pyogrio_not_supported(engine):
 
 @pytest.fixture
 def df_nybb(engine):
-    nybb_path = geopandas.datasets.get_path("nybb")
+    nybb_path = geodatasets.get_path("nybb")
     df = read_file(nybb_path, engine=engine)
     return df
 
@@ -439,7 +441,7 @@ def test_to_file_crs(tmpdir, engine):
     Ensure that the file is written according to the crs
     if it is specified
     """
-    df = read_file(geopandas.datasets.get_path("nybb"), engine=engine)
+    df = read_file(geodatasets.get_path("nybb"), engine=engine)
     tempfilename = os.path.join(str(tmpdir), "crs.shp")
 
     # save correct CRS
@@ -566,7 +568,7 @@ NYBB_CRS = "epsg:2263"
 
 
 def test_read_file(engine):
-    df = read_file(geopandas.datasets.get_path("nybb"), engine=engine)
+    df = read_file(geodatasets.get_path("nybb"), engine=engine)
     validate_boro_df(df)
     assert df.crs == NYBB_CRS
     expected_columns = ["BoroCode", "BoroName", "Shape_Leng", "Shape_Area"]
@@ -656,7 +658,7 @@ def test_read_binary_file_fsspec(engine):
     fsspec = pytest.importorskip("fsspec")
     # Remove the zip scheme so fsspec doesn't open as a zipped file,
     # instead we want to read as bytes and let fiona decode it.
-    path = geopandas.datasets.get_path("nybb")[6:]
+    path = geodatasets.get_path("nybb")[6:]
     with fsspec.open(path, "rb") as f:
         gdf = read_file(f, engine=engine)
         assert isinstance(gdf, geopandas.GeoDataFrame)
@@ -672,7 +674,7 @@ def test_read_text_file_fsspec(file_path, engine):
 def test_infer_zipped_file(engine):
     # Remove the zip scheme so that the test for a zipped file can
     # check it and add it back.
-    path = geopandas.datasets.get_path("nybb")[6:]
+    path = geodatasets.get_path("nybb")[6:]
     gdf = read_file(path, engine=engine)
     assert isinstance(gdf, geopandas.GeoDataFrame)
 
@@ -689,13 +691,13 @@ def test_infer_zipped_file(engine):
 
 def test_allow_legacy_gdal_path(engine):
     # Construct a GDAL-style zip path.
-    path = "/vsizip/" + geopandas.datasets.get_path("nybb")[6:]
+    path = "/vsizip/" + geodatasets.get_path("nybb")[6:]
     gdf = read_file(path, engine=engine)
     assert isinstance(gdf, geopandas.GeoDataFrame)
 
 
 def test_read_file_filtered__bbox(df_nybb, engine):
-    nybb_filename = geopandas.datasets.get_path("nybb")
+    nybb_filename = geodatasets.get_path("nybb")
     bbox = (
         1031051.7879884212,
         224272.49231459625,
@@ -708,7 +710,7 @@ def test_read_file_filtered__bbox(df_nybb, engine):
 
 
 def test_read_file_filtered__bbox__polygon(df_nybb, engine):
-    nybb_filename = geopandas.datasets.get_path("nybb")
+    nybb_filename = geodatasets.get_path("nybb")
     bbox = box(
         1031051.7879884212, 224272.49231459625, 1047224.3104931959, 244317.30894023244
     )
@@ -718,13 +720,13 @@ def test_read_file_filtered__bbox__polygon(df_nybb, engine):
 
 
 def test_read_file_filtered__rows(df_nybb, engine):
-    nybb_filename = geopandas.datasets.get_path("nybb")
+    nybb_filename = geodatasets.get_path("nybb")
     filtered_df = read_file(nybb_filename, rows=1, engine=engine)
     assert_geodataframe_equal(filtered_df, df_nybb.iloc[[0], :])
 
 
 def test_read_file_filtered__rows_slice(df_nybb, engine):
-    nybb_filename = geopandas.datasets.get_path("nybb")
+    nybb_filename = geodatasets.get_path("nybb")
     filtered_df = read_file(nybb_filename, rows=slice(1, 3), engine=engine)
     assert_geodataframe_equal(filtered_df, df_nybb.iloc[1:3, :].reset_index(drop=True))
 
@@ -733,7 +735,7 @@ def test_read_file_filtered__rows_slice(df_nybb, engine):
     "ignore:Layer does not support OLC_FASTFEATURECOUNT:RuntimeWarning"
 )  # for the slice with -1
 def test_read_file_filtered__rows_bbox(df_nybb, engine):
-    nybb_filename = geopandas.datasets.get_path("nybb")
+    nybb_filename = geodatasets.get_path("nybb")
     bbox = (
         1031051.7879884212,
         224272.49231459625,
@@ -774,14 +776,12 @@ def test_read_file_filtered__rows_bbox(df_nybb, engine):
 
 def test_read_file_filtered_rows_invalid(engine):
     with pytest.raises(TypeError):
-        read_file(
-            geopandas.datasets.get_path("nybb"), rows="not_a_slice", engine=engine
-        )
+        read_file(geodatasets.get_path("nybb"), rows="not_a_slice", engine=engine)
 
 
 def test_read_file__ignore_geometry(engine):
     pdf = geopandas.read_file(
-        geopandas.datasets.get_path("naturalearth_lowres"),
+        geodatasets.get_path("naturalearth_lowres"),
         ignore_geometry=True,
         engine=engine,
     )
@@ -792,7 +792,7 @@ def test_read_file__ignore_geometry(engine):
 def test_read_file__ignore_all_fields(engine):
     skip_pyogrio_not_supported(engine)  # pyogrio has "columns" keyword instead
     gdf = geopandas.read_file(
-        geopandas.datasets.get_path("naturalearth_lowres"),
+        geodatasets.get_path("naturalearth_lowres"),
         ignore_fields=["pop_est", "continent", "name", "iso_a3", "gdp_md_est"],
         engine="fiona",
     )
@@ -802,7 +802,7 @@ def test_read_file__ignore_all_fields(engine):
 def test_read_file__where_filter(engine):
     if FIONA_GE_19 or engine == "pyogrio":
         gdf = geopandas.read_file(
-            geopandas.datasets.get_path("naturalearth_lowres"),
+            geodatasets.get_path("naturalearth_lowres"),
             where="continent='Africa'",
             engine=engine,
         )
@@ -810,7 +810,7 @@ def test_read_file__where_filter(engine):
     else:
         with pytest.raises(NotImplementedError):
             geopandas.read_file(
-                geopandas.datasets.get_path("naturalearth_lowres"),
+                geodatasets.get_path("naturalearth_lowres"),
                 where="continent='Africa'",
                 engine="fiona",
             )
@@ -820,7 +820,7 @@ def test_read_file__where_filter(engine):
 def test_read_file__columns():
     # TODO: this is only support for pyogrio, but we could mimic it for fiona as well
     gdf = geopandas.read_file(
-        geopandas.datasets.get_path("naturalearth_lowres"),
+        geodatasets.get_path("naturalearth_lowres"),
         columns=["name", "pop_est"],
         engine="pyogrio",
     )
@@ -829,7 +829,7 @@ def test_read_file__columns():
 
 def test_read_file_filtered_with_gdf_boundary(df_nybb, engine):
     full_df_shape = df_nybb.shape
-    nybb_filename = geopandas.datasets.get_path("nybb")
+    nybb_filename = geodatasets.get_path("nybb")
     bbox = geopandas.GeoDataFrame(
         geometry=[
             box(
@@ -849,9 +849,9 @@ def test_read_file_filtered_with_gdf_boundary(df_nybb, engine):
 
 def test_read_file_filtered_with_gdf_boundary__mask(df_nybb, engine):
     skip_pyogrio_not_supported(engine)
-    gdf_mask = geopandas.read_file(geopandas.datasets.get_path("naturalearth_lowres"))
+    gdf_mask = geopandas.read_file(geodatasets.get_path("naturalearth_lowres"))
     gdf = geopandas.read_file(
-        geopandas.datasets.get_path("naturalearth_cities"),
+        geodatasets.get_path("naturalearth_cities"),
         mask=gdf_mask[gdf_mask.continent == "Africa"],
         engine=engine,
     )
@@ -862,7 +862,7 @@ def test_read_file_filtered_with_gdf_boundary__mask(df_nybb, engine):
 def test_read_file_filtered_with_gdf_boundary__mask__polygon(df_nybb, engine):
     skip_pyogrio_not_supported(engine)
     full_df_shape = df_nybb.shape
-    nybb_filename = geopandas.datasets.get_path("nybb")
+    nybb_filename = geodatasets.get_path("nybb")
     mask = box(
         1031051.7879884212, 224272.49231459625, 1047224.3104931959, 244317.30894023244
     )
@@ -875,7 +875,7 @@ def test_read_file_filtered_with_gdf_boundary__mask__polygon(df_nybb, engine):
 def test_read_file_filtered_with_gdf_boundary_mismatched_crs(df_nybb, engine):
     skip_pyogrio_not_supported(engine)
     full_df_shape = df_nybb.shape
-    nybb_filename = geopandas.datasets.get_path("nybb")
+    nybb_filename = geodatasets.get_path("nybb")
     bbox = geopandas.GeoDataFrame(
         geometry=[
             box(
@@ -897,7 +897,7 @@ def test_read_file_filtered_with_gdf_boundary_mismatched_crs(df_nybb, engine):
 def test_read_file_filtered_with_gdf_boundary_mismatched_crs__mask(df_nybb, engine):
     skip_pyogrio_not_supported(engine)
     full_df_shape = df_nybb.shape
-    nybb_filename = geopandas.datasets.get_path("nybb")
+    nybb_filename = geodatasets.get_path("nybb")
     mask = geopandas.GeoDataFrame(
         geometry=[
             box(
@@ -948,7 +948,7 @@ def test_read_file_empty_shapefile(tmpdir, engine):
 
 def test_read_file_privacy(tmpdir, df_nybb):
     with pytest.warns(FutureWarning):
-        geopandas.io.file.read_file(geopandas.datasets.get_path("nybb"))
+        geopandas.io.file.read_file(geodatasets.get_path("nybb"))
 
 
 class FileNumber(object):
@@ -1175,7 +1175,7 @@ def test_option_io_engine():
         orig = fiona.supported_drivers["ESRI Shapefile"]
         fiona.supported_drivers["ESRI Shapefile"] = "w"
 
-        nybb_filename = geopandas.datasets.get_path("nybb")
+        nybb_filename = geodatasets.get_path("nybb")
         _ = geopandas.read_file(nybb_filename)
     finally:
         fiona.supported_drivers["ESRI Shapefile"] = orig

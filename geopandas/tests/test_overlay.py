@@ -1,5 +1,6 @@
 import os
 
+import geodatasets
 import numpy as np
 import pandas as pd
 
@@ -113,7 +114,7 @@ def test_overlay(dfs_index, how):
 
 @pytest.mark.filterwarnings("ignore:GeoSeries crs mismatch:UserWarning")
 def test_overlay_nybb(how):
-    polydf = read_file(geopandas.datasets.get_path("nybb"))
+    polydf = read_file(geodatasets.get_path("nybb"))
 
     # The circles have been constructed and saved at the time the expected
     # results were created (exact output of buffer algorithm can slightly
@@ -712,7 +713,7 @@ def test_overlap_make_valid(make_valid):
 
 
 def test_empty_overlay_return_non_duplicated_columns():
-    nybb = geopandas.read_file(geopandas.datasets.get_path("nybb"))
+    nybb = geopandas.read_file(geodatasets.get_path("nybb"))
     nybb2 = nybb.copy()
     nybb2.geometry = nybb2.translate(20000000)
 

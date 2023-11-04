@@ -20,7 +20,7 @@ from shapely.geometry import (
 
 
 from geopandas import GeoDataFrame, GeoSeries, read_file
-from geopandas.datasets import get_path
+from geodatasets import get_path
 import geopandas._compat as compat
 from geopandas.plotting import GeoplotAccessor
 

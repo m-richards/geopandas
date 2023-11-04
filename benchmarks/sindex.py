@@ -12,8 +12,8 @@ geom_types = ("mixed", "points", "polygons")
 
 
 def generate_test_df():
-    world = read_file(datasets.get_path("naturalearth_lowres"))
-    capitals = read_file(datasets.get_path("naturalearth_cities"))
+    world = read_file(geodatasets.get_path("naturalearth_lowres"))
+    capitals = read_file(geodatasets.get_path("naturalearth_cities"))
     countries = world.to_crs("epsg:3395")[["geometry"]]
     capitals = capitals.to_crs("epsg:3395")[["geometry"]]
     mixed = capitals.append(countries)  # get a mix of geometries

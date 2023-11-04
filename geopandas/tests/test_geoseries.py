@@ -6,6 +6,7 @@ import shutil
 import tempfile
 import warnings
 
+import geodatasets
 import numpy as np
 from numpy.testing import assert_array_equal
 import pandas as pd
@@ -23,7 +24,7 @@ from shapely.geometry import (
 )
 from shapely.geometry.base import BaseGeometry
 
-from geopandas import GeoSeries, GeoDataFrame, read_file, datasets, clip
+from geopandas import GeoSeries, GeoDataFrame, read_file, clip
 from geopandas.array import GeometryArray, GeometryDtype
 from geopandas.testing import assert_geoseries_equal, geom_almost_equals
 
@@ -320,8 +321,8 @@ class TestSeries:
         assert_series_equal(pd.Series([self.t1.wkt, self.sq.wkt]), self.g1.to_wkt())
 
     def test_clip(self):
-        left = read_file(datasets.get_path("naturalearth_cities"))
-        world = read_file(datasets.get_path("naturalearth_lowres"))
+        left = read_file(geodatasets.get_path("naturalearth_cities"))
+        world = read_file(geodatasets.get_path("naturalearth_lowres"))
         south_america = world[world["continent"] == "South America"]
 
         expected = clip(left.geometry, south_america)
