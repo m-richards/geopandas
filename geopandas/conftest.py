@@ -9,6 +9,9 @@ def add_geopandas(doctest_namespace):
     doctest_namespace["geopandas"] = geopandas
 
 
+# Datasets used in our tests
+
+
 @pytest.fixture(scope="session")
 def naturalearth_lowres() -> Path:
     ref = (
