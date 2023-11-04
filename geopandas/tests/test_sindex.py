@@ -1,5 +1,6 @@
 from math import sqrt
 
+import geodatasets
 import numpy as np
 import pandas as pd
 import pytest
@@ -15,7 +16,7 @@ from shapely.geometry import (
 )
 
 import geopandas
-from geopandas import GeoDataFrame, GeoSeries, datasets, read_file
+from geopandas import GeoDataFrame, GeoSeries, read_file
 from geopandas import _compat as compat
 
 
@@ -206,7 +207,7 @@ class TestFrameSindex:
 @pytest.mark.skip
 class TestJoinSindex:
     def setup_method(self):
-        nybb_filename = geopandas.datasets.get_path("nybb")
+        nybb_filename = geodatasets.get_path("nybb")
         self.boros = read_file(nybb_filename)
 
     def test_merge_geo(self):
@@ -845,10 +846,12 @@ class TestShapelyInterface:
             ("touches", (2, 0)),
         ],
     )
-    def test_integration_natural_earth(self, predicate, expected_shape):
+    def test_integration_natural_earth(
+        self, predicate, expected_shape, naturalearth_lowres, naturalearth_cities
+    ):
         """Tests output sizes for the naturalearth datasets."""
-        world = read_file(datasets.get_path("naturalearth_lowres"))
-        capitals = read_file(datasets.get_path("naturalearth_cities"))
+        world = read_file(naturalearth_lowres)
+        capitals = read_file(naturalearth_cities)
 
         res = world.sindex.query(capitals.geometry, predicate)
         assert res.shape == expected_shape

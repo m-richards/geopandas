@@ -10,6 +10,7 @@ dependencies:
   - fiona
   - pyproj
   - packaging
+  - geodatasets
   # testing
   - pytest
   - pytest-cov

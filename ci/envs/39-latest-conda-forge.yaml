@@ -12,6 +12,7 @@ dependencies:
   - pyproj
   # use this build to have one with only shapely 2.0 installed
   - packaging
+  - geodatasets
   # testing
   - pytest
   - pytest-cov

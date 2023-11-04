@@ -925,7 +925,7 @@ Improvements:
   a single color (#238).
 - Larger flexibility of ``to_crs``, accepting both dicts and proj strings (#289)
 - Addition of embedded example data, accessible through
-  ``geopandas.datasets.get_path``.
+  ``geodatasets.get_path``.
 
 API changes:
 

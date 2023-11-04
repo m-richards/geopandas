@@ -6,7 +6,7 @@ from shapely.geometry import Point
 
 class CRS:
     def setup(self):
-        nybb = read_file(datasets.get_path("nybb"))
+        nybb = read_file(geodatasets.get_path("nybb"))
         self.long_nybb = GeoDataFrame(pd.concat(10 * [nybb]), crs=nybb.crs)
 
         num_points = 20000

@@ -9,6 +9,7 @@ dependencies:
   - pyproj
   - geos
   - packaging
+  - geodatasets
   # testing
   - pytest
   - pytest-cov

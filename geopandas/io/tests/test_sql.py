@@ -7,6 +7,7 @@ see geopandas.tests.util for more information.
 import os
 import warnings
 
+import geodatasets
 import pandas as pd
 
 import geopandas
@@ -27,7 +28,7 @@ except ImportError:
 
 @pytest.fixture
 def df_nybb():
-    nybb_path = geopandas.datasets.get_path("nybb")
+    nybb_path = geodatasets.get_path("nybb")
     df = read_file(nybb_path)
     return df
 
