@@ -38,6 +38,7 @@ dependencies:
   - libpysal
   - xyzservices
   - packaging
+  - geodatasets
   - pointpats
   - pip
   - pip:

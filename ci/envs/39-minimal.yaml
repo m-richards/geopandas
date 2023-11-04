@@ -9,6 +9,7 @@ dependencies:
   - shapely=2.0.0
   - fiona=1.8.21
   - packaging
+  - geodatasets
   # testing
   - pytest
   - pytest-cov
