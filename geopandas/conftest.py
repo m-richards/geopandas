@@ -27,3 +27,14 @@ def naturalearth_cities() -> Path:
     )
     with resources.as_file(ref) as path:
         yield path
+
+
+@pytest.fixture(scope="session")
+def nybb_zipped() -> str:
+    ref = resources.files("geopandas.datasets") / "nybb_16a.zip"
+    with resources.as_file(ref) as path:
+        yield "zip://" + str(path)
+
+    # should be equivalent to
+    # geodatasets = pytest.importorskip("geodatasets")
+    # yield Path(geodatasets.get_path("nybb")).parent.parent.parent / "nybb_16a.zip"

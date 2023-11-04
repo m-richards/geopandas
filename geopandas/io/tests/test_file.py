@@ -671,10 +671,10 @@ def test_read_text_file_fsspec(file_path, engine):
         assert isinstance(gdf, geopandas.GeoDataFrame)
 
 
-def test_infer_zipped_file(engine):
+def test_infer_zipped_file(engine, nybb_zipped):
     # Remove the zip scheme so that the test for a zipped file can
     # check it and add it back.
-    path = geodatasets.get_path("nybb")[6:]
+    path = nybb_zipped[6:]
     gdf = read_file(path, engine=engine)
     assert isinstance(gdf, geopandas.GeoDataFrame)
 
@@ -689,9 +689,9 @@ def test_infer_zipped_file(engine):
     assert isinstance(gdf, geopandas.GeoDataFrame)
 
 
-def test_allow_legacy_gdal_path(engine):
+def test_allow_legacy_gdal_path(engine, nybb_zipped):
     # Construct a GDAL-style zip path.
-    path = "/vsizip/" + geodatasets.get_path("nybb")[6:]
+    path = "/vsizip/" + nybb_zipped[6:]
     gdf = read_file(path, engine=engine)
     assert isinstance(gdf, geopandas.GeoDataFrame)
 
