@@ -6,6 +6,7 @@ from functools import lru_cache
 
 import numpy as np
 import pandas as pd
+import pandas.core.common
 from pandas.api.extensions import (
     ExtensionArray,
     ExtensionDtype,
@@ -426,6 +427,15 @@ class GeometryArray(ExtensionArray):
             if isinstance(key, numbers.Integral):
                 raise ValueError("cannot set a single element with an array")
             self._data[key] = value._data
+            if self._data[key].shape == value._data.shape:
+                self._data[key] = value._data
+            elif pandas.core.common.is_null_slice(key):
+                raise ValueError(
+                    "Full slice can't be done inplace?"
+                )  # unless dimensions match
+            else:
+                raise ValueError("panic")
+
         elif isinstance(value, BaseGeometry) or isna(value):
             if isna(value):
                 # internally only use None as missing value indicator

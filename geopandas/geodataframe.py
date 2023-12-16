@@ -1540,6 +1540,37 @@ individually so that features may have different properties
         super().__setitem__(key, value)
 
     #
+    # def isetitem(self, loc, value) -> None:
+    #     """
+    #     TODO
+    #     """
+    #     if self._geometry_column_name is not None:
+    #         geom_col_loc = self.columns.get_loc(self._geometry_column_name)
+    #     else:
+    #         geom_col_loc = None
+    #
+    #     if not pd.api.types.is_list_like(loc) and (
+    #             loc == geom_col_loc
+    #     ):
+    #         if pd.api.types.is_scalar(value) or isinstance(value, BaseGeometry):
+    #             value = [value] * self.shape[0]
+    #         if self._geometry_column_name is not None:
+    #             crs = getattr(self, "crs", None)
+    #         else:  # don't use getattr, because a col "crs" might exist
+    #             crs = None
+    #
+    #         try:
+    #             value = _ensure_geometry(value, crs=crs)
+    #             # if key == "geometry":
+    #             #     self._persist_old_default_geometry_colname()
+    #         except TypeError:
+    #             warnings.warn(
+    #                 "Geometry column does not contain geometry.",
+    #                 stacklevel=2,
+    #             )
+    #     super().isetitem(loc, value)
+
+    #
     # Implement pandas methods
     #
     @doc(pd.DataFrame)

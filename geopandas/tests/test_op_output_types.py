@@ -1,6 +1,7 @@
 import pandas as pd
 import pyproj
 import pytest
+from shapely import Polygon
 
 from shapely.geometry import Point
 import numpy as np
@@ -380,3 +381,33 @@ def test_merge_preserve_geodataframe():
     assert_obj_no_active_geo_col(res, GeoDataFrame, geo_colname=None)
     expected = GeoDataFrame({"geo_x": ser, "geo_y": ser})
     assert_geodataframe_equal(expected, res)
+
+
+@pytest.fixture
+def polygon():
+    return Polygon([(0, 0), (1, 0), (1, 1), (0, 1)])
+
+
+def test_loc_edge_case1(polygon):
+    gdf = GeoDataFrame([], geometry=[], crs=crs_wgs)
+    gdf.loc[:, "geometry"] = [polygon]
+    assert gdf.geometry.dtype == "geometry"
+    assert len(gdf) == 1
+    assert gdf.crs == crs_wgs
+
+
+def test_loc_edge_case2(polygon):
+    gdf = GeoDataFrame([], geometry=[], crs=crs_wgs)
+    gdf.loc[0] = [polygon]
+    assert len(gdf) == 1
+    assert gdf.crs == crs_wgs
+    assert gdf.geometry.dtype == "geometry"
+    gdf.loc[0] = [polygon]
+
+
+def test_loc_edge_case3(polygon):
+    gdf = GeoDataFrame([], geometry=[], crs=crs_wgs)
+    gdf.loc[0, :] = polygon
+    assert len(gdf) == 1
+    assert gdf.crs == crs_wgs
+    assert gdf.geometry.dtype == "geometry"
