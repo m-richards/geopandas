@@ -15,8 +15,7 @@ dependencies:
   - pytest-xdist
   - fsspec
   # optional
-  - fiona
-  - matplotlib
+  - matplotlib-base
   - mapclassify
   - folium
   - xyzservices
@@ -26,12 +25,15 @@ dependencies:
   - geodatasets
   # installed in tests.yaml, because not available on windows
   # - postgis
-  - SQLalchemy>=2
-  - psycopg
+  - SQLalchemy<2
   - psycopg2
   - libspatialite
   - geoalchemy2
   - pyarrow
   - geoarrow-pyarrow
+  - fiona
   # doctest testing
   - pytest-doctestplus
+  - pip
+  - pip:
+      - git+https://github.com/geopandas/pyogrio.git@main
