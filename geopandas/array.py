@@ -1347,18 +1347,11 @@ class GeometryArray(ExtensionArray):
 
         # note ExtensionArray usage of value_counts only specifies dropna,
         # so sort, normalize and bins are not arguments
-        values = to_wkb(self)
-        from pandas import Index, Series
+        from pandas import Series
+        from pandas.core.algorithms import value_counts_arraylike
 
-        result = Series(values).value_counts(dropna=dropna)
-        # value_counts converts None to nan, need to convert back for from_wkb to work
-        # note result.index already has object dtype, not geometry
-        # Can't use fillna(None) or Index.putmask, as this gets converted back to nan
-        # for object dtypes
-        result.index = Index(
-            from_wkb(np.where(result.index.isna(), None, result.index))
-        )
-        return result
+        keys, counts = value_counts_arraylike(self._data, dropna)
+        return Series(counts, index=keys)
 
     def unique(self):
         """Compute the ExtensionArray of unique values.

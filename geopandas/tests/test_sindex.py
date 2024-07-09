@@ -203,8 +203,6 @@ class TestFrameSindex:
         assert old_sindex is new_sindex
 
 
-# Skip to accommodate Shapely geometries being unhashable # TODO unskip?
-@pytest.mark.skip
 @pytest.mark.usefixtures("_setup_class_nybb_filename")
 class TestJoinSindex:
     def setup_method(self):

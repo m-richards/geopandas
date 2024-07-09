@@ -591,18 +591,14 @@ def test_value_counts():
     assert_series_equal(res4_keepna, exp4_keepna)
 
 
-@pytest.mark.xfail(strict=False)
+@pytest.mark.skipif(not compat.PANDAS_GE_22, reason="fixed in pandas 2.2")
 def test_drop_duplicates_series():
-    # duplicated does not yet use EA machinery
-    # (https://github.com/pandas-dev/pandas/issues/27264)
-    # but relies on unstable hashing of unhashable objects in numpy array
-    # giving flaky test (https://github.com/pandas-dev/pandas/issues/27035)
     dups = GeoSeries([Point(0, 0), Point(0, 0)])
     dropped = dups.drop_duplicates()
     assert len(dropped) == 1
 
 
-@pytest.mark.xfail(strict=False)
+@pytest.mark.skipif(not compat.PANDAS_GE_22, reason="fixed in pandas 2.2")
 def test_drop_duplicates_frame():
     # duplicated does not yet use EA machinery, see above
     gdf_len = 3
