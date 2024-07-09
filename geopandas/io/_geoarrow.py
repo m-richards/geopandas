@@ -1,6 +1,6 @@
 import json
 from packaging.version import Version
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -83,6 +83,46 @@ class GeoArrowArray:
         )
 
 
+def _column_name_to_strings(name):
+    """Convert a column name (or level) to either a string or a recursive
+    collection of strings.
+    https://github.com/apache/arrow/blob/8d5b289b100e068b47739d8fee0efdead9f1c574/python/pyarrow/pandas_compat.py#L292
+
+    Parameters
+    ----------
+    name : str or tuple
+
+    Returns
+    -------
+    value : str or tuple
+
+    Examples
+    --------
+    >>> name = 'foo'
+    >>> _column_name_to_strings(name)
+    'foo'
+    >>> name = ('foo', 'bar')
+    >>> _column_name_to_strings(name)
+    "('foo', 'bar')"
+    >>> import pandas as pd
+    >>> name = (1, pd.Timestamp('2017-02-01 00:00:00'))
+    >>> _column_name_to_strings(name)
+    "('1', '2017-02-01 00:00:00')"
+    """
+    if isinstance(name, str):
+        return name
+    elif isinstance(name, bytes):
+        # XXX: should we assume that bytes in Python 3 are UTF-8?
+        return name.decode("utf8")
+    elif isinstance(name, tuple):
+        return str(tuple(map(_column_name_to_strings, name)))
+    elif isinstance(name, Sequence):
+        raise TypeError("Unsupported type for MultiIndex level")
+    elif name is None:
+        return None
+    return str(name)
+
+
 def geopandas_to_arrow(
     df,
     index=None,
@@ -143,15 +183,16 @@ def geopandas_to_arrow(
 
         # Encode all geometry columns to GeoArrow
         for i, col in zip(geometry_indices, geometry_columns):
+            col_str = _column_name_to_strings(col)
             field, geom_arr = construct_geometry_array(
                 np.array(df[col].array),
                 include_z=include_z,
-                field_name=col,
+                field_name=col_str,
                 crs=df[col].crs,
                 interleaved=interleaved,
             )
             table = table.set_column(i, field, geom_arr)
-            geometry_encoding_dict[col] = (
+            geometry_encoding_dict[col_str] = (
                 field.metadata[b"ARROW:extension:name"]
                 .decode()
                 .removeprefix("geoarrow.")
@@ -160,11 +201,13 @@ def geopandas_to_arrow(
     elif geometry_encoding.lower() == "wkb":
         # Encode all geometry columns to WKB
         for i, col in zip(geometry_indices, geometry_columns):
+            col_str = _column_name_to_strings(col)
+            # TODO check what pandas does for metadata, does it use the flat name?
             field, wkb_arr = construct_wkb_array(
-                np.asarray(df[col].array), field_name=col, crs=df[col].crs
+                np.asarray(df[col].array), field_name=col_str, crs=df[col].crs
             )
             table = table.set_column(i, field, wkb_arr)
-            geometry_encoding_dict[col] = "WKB"
+            geometry_encoding_dict[col_str] = "WKB"
 
     else:
         raise ValueError(

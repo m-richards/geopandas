@@ -1330,3 +1330,34 @@ def test_read_parquet_bbox_points(tmp_path):
     assert len(result) == 10
     result = geopandas.read_parquet(tmp_path / "test.parquet", bbox=(3, 3, 5, 5))
     assert len(result) == 3
+
+
+def test_multiindex_cols():
+    import shapely
+
+    import geopandas as gpd
+
+    gdf = gpd.GeoDataFrame(
+        {("foo", "bar"): [0, 1], ("foo", "baz"): [0, 1], ("dog", "cat"): [0, 1]},
+        geometry=[shapely.Point(0, 0), shapely.Point(1, 2)],
+    )
+    print(gdf)
+    print(gdf.columns)
+    print(gdf.active_geometry_name)
+
+    gdf.to_parquet("test2.parquet")
+
+    frame = gdf.drop(columns=["geometry"])
+    frame.to_parquet("test.parquet")
+
+    # df = pd.read_parquet("test.parquet")
+
+    gdf = gpd.read_parquet("test2.parquet")
+
+    print(gdf.columns)
+    print(gdf.active_geometry_name)
+
+    # https://github.com/apache/arrow/blob/8d5b289b100e068b47739d8fee0efdead9f1c574/python/pyarrow/pandas_compat.py#L292
+    # table_to_blockmanager
+    # _deserialize_column_index
+    # table.to_pandas() does the work

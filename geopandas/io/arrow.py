@@ -12,6 +12,7 @@ from geopandas import GeoDataFrame
 from geopandas._compat import import_optional_dependency
 from geopandas.array import from_shapely, from_wkb
 
+from ._geoarrow import _column_name_to_strings
 from .file import _expand_user
 
 METADATA_VERSION = "1.0.0"
@@ -147,6 +148,7 @@ def _create_metadata(
     # Construct metadata for each geometry
     column_metadata = {}
     for col in df.columns[df.dtypes == "geometry"]:
+        col_str = _column_name_to_strings(col)
         series = df[col]
 
         geometry_types = _get_geometry_types(series)
@@ -165,8 +167,8 @@ def _create_metadata(
                 crs = series.crs.to_json_dict()
                 _remove_id_from_member_of_ensembles(crs)
 
-        column_metadata[col] = {
-            "encoding": geometry_encoding[col],
+        column_metadata[col_str] = {
+            "encoding": geometry_encoding[col_str],
             "crs": crs,
             geometry_types_name: geometry_types,
         }
@@ -174,10 +176,10 @@ def _create_metadata(
         bbox = series.total_bounds.tolist()
         if np.isfinite(bbox).all():
             # don't add bbox with NaNs for empty / all-NA geometry column
-            column_metadata[col]["bbox"] = bbox
+            column_metadata[col_str]["bbox"] = bbox
 
         if write_covering_bbox:
-            column_metadata[col]["covering"] = {
+            column_metadata[col_str]["covering"] = {
                 "bbox": {
                     "xmin": ["bbox", "xmin"],
                     "ymin": ["bbox", "ymin"],
@@ -241,9 +243,9 @@ def _validate_dataframe(df):
     if not isinstance(df, DataFrame):
         raise ValueError("Writing to Parquet/Feather only supports IO with DataFrames")
 
-    # must have value column names (strings only)
-    if df.columns.inferred_type not in {"string", "unicode", "empty"}:
-        raise ValueError("Writing to Parquet/Feather requires string column names")
+    # # must have value column names (strings only)
+    # if df.columns.inferred_type not in {"string", "unicode", "empty"}:
+    #     raise ValueError("Writing to Parquet/Feather requires string column names")
 
     # index level names must be strings
     valid_names = all(
@@ -495,11 +497,15 @@ def _arrow_to_geopandas(table, geo_metadata=None):
 
     # Find all geometry columns that were read from the file.  May
     # be a subset if 'columns' parameter is used.
+    parquet_colnames = table.column_names
     geometry_columns = [
-        col for col in geo_metadata["columns"] if col in table.column_names
+        col for col in geo_metadata["columns"] if col in parquet_colnames
     ]
+    # result column names will deserialise multiindex columns, e.g.
+    # "('geometry', '')" -> ('geometry', '')
     result_column_names = list(table.slice(0, 0).to_pandas().columns)
-    geometry_columns.sort(key=result_column_names.index)
+    parquet_colnames_to_pandas = dict(zip(parquet_colnames, result_column_names))
+    geometry_columns.sort(key=parquet_colnames.index)
 
     if not len(geometry_columns):
         raise ValueError(
@@ -550,9 +556,13 @@ def _arrow_to_geopandas(table, geo_metadata=None):
                 crs=crs,
             )
 
-        df.insert(result_column_names.index(col), col, geom_arr)
+        df.insert(
+            parquet_colnames.index(col), parquet_colnames_to_pandas[col], geom_arr
+        )
 
-    return GeoDataFrame(df, geometry=geometry)
+    return GeoDataFrame(
+        df, geometry=parquet_colnames_to_pandas[geometry]
+    )  # TODO should geometry always be a string?
 
 
 def _get_filesystem_path(path, filesystem=None, storage_options=None):
@@ -751,12 +761,13 @@ def _read_parquet(path, columns=None, storage_options=None, bbox=None, **kwargs)
     schema, metadata = _read_parquet_schema_and_metadata(path, filesystem)
 
     geo_metadata = _validate_and_decode_metadata(metadata)
+    #
+    # bbox_filter = (
+    #     _get_parquet_bbox_filter(geo_metadata, bbox) if bbox is not None else None
+    # )
+    bbox_filter = None
 
-    bbox_filter = (
-        _get_parquet_bbox_filter(geo_metadata, bbox) if bbox is not None else None
-    )
-
-    if_bbox_column_exists = _check_if_covering_in_geo_metadata(geo_metadata)
+    if_bbox_column_exists = False
 
     # by default, bbox column is not read in, so must specify which
     # columns are read in if it exists.
