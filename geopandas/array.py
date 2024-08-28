@@ -1749,7 +1749,7 @@ def transform(data, func):
     has_z = shapely.has_z(data)
 
     result = np.empty_like(data)
-
+    # TODO if mask empty, then skip?
     coords = shapely.get_coordinates(data[~has_z], include_z=False)
     new_coords_z = func(coords[:, 0], coords[:, 1])
     result[~has_z] = shapely.set_coordinates(

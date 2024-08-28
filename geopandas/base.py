@@ -49,16 +49,44 @@ def _delegate_binary_method(op, this, other, align, *args, **kwargs):
             this, other = this.align(other.geometry)
         else:
             other = other.geometry
+        # use array to discard index, as we have already explicitly dealt with alignment
+        # (and for align=False, we neeed to drop rows, not align them)
+        pd.concat(
+            [
+                this.reset_index(drop=True).rename("this"),
+                other.reset_index(drop=True).rename("other"),
+            ],
+            axis=1,
+        ).to_parquet("temp.parquet")
 
-        a_this = GeometryArray(this.values)
+        # a_this = GeometryArray(this.values)
         other = GeometryArray(other.values)
     elif isinstance(other, BaseGeometry):
-        a_this = GeometryArray(this.values)
+        from geopandas import GeoSeries
+
+        this.rename("this").to_frame().assign(
+            other=GeoSeries(other, index=this.index)
+        ).to_parquet("temp.parquet")
+        # a_this = GeometryArray(this.values)
     else:
         raise TypeError(type(this), type(other))
 
-    data = getattr(a_this, op)(other, *args, **kwargs)
-    return data, this.index
+    # data = getattr(a_this, op)(other, *args, **kwargs)
+    import duckdb
+
+    function_map = {
+        # "intersects":"ST_Intersects",
+        "covered_by": "ST_CoveredBy"  # TODO snake to camel auto?
+    }
+
+    duckdb.sql("INSTALL spatial;")
+    duckdb.sql("LOAD spatial;")
+    values = duckdb.sql(
+        f"SELECT COALESCE({function_map.get(op, f'ST_{op.capitalize()}')}("
+        "ST_GeomFromWKB(this), ST_GeomFromWKB(other)),false) "
+        "result from read_parquet(temp.parquet)"
+    ).df()
+    return values.squeeze().to_numpy(), this.index
 
 
 def _binary_geo(op, this, other, align, *args, **kwargs):
@@ -78,8 +106,33 @@ def _binary_op(op, this, other, align, *args, **kwargs):
 
 
 def _delegate_property(op, this):
+    import duckdb
+
     # type: (str, GeoSeries) -> GeoSeries/Series
+    from .geoseries import GeoSeries
+
+    GeoSeries(this, name="this").to_frame().to_parquet("temp.parquet")
+    # function_map = {
+    #     # "intersects":"ST_Intersects",
+    #     "is_valid": "ST_IsValid"  # TODO snake to camel auto?
+    # }
+
+    duckdb.sql("INSTALL spatial;")
+    duckdb.sql("LOAD spatial;")
+    values = (
+        duckdb.sql(
+            "SELECT ST_IsValid(ST_GeomFromWKB(this)) "
+            "result from read_parquet(temp.parquet)"
+        )
+        .df()
+        .squeeze()
+    )
+    from .geoseries import GeoSeries
+
+    result = Series(values.array, index=this.index)
+    return result
     a_this = GeometryArray(this.geometry.values)
+
     data = getattr(a_this, op)
     if isinstance(data, GeometryArray):
         from .geoseries import GeoSeries
