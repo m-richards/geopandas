@@ -26,7 +26,9 @@ def is_geometry_type(data):
         return False
 
 
-def _delegate_binary_method(op, this, other, align, *args, **kwargs):
+def _delegate_binary_method(
+    op, this, other, align, *args, geo_result: bool = False, **kwargs
+):
     # type: (str, GeoSeries, GeoSeries) -> GeoSeries/Series
     if align is None:
         align = True
@@ -74,19 +76,29 @@ def _delegate_binary_method(op, this, other, align, *args, **kwargs):
     # data = getattr(a_this, op)(other, *args, **kwargs)
     import duckdb
 
-    function_map = {
-        # "intersects":"ST_Intersects",
-        "covered_by": "ST_CoveredBy"  # TODO snake to camel auto?
-    }
-
     duckdb.sql("INSTALL spatial;")
     duckdb.sql("LOAD spatial;")
-    values = duckdb.sql(
-        f"SELECT COALESCE({function_map.get(op, f'ST_{op.capitalize()}')}("
-        "ST_GeomFromWKB(this), ST_GeomFromWKB(other)),false) "
-        "result from read_parquet(temp.parquet)"
-    ).df()
-    return values.squeeze().to_numpy(), this.index
+    st_function = BINARY_FUNCTION_NAMES.get(op, f"ST_{op.capitalize()}")
+    if st_function == "geopandas":
+        a_this = GeometryArray(this.values)
+        data = getattr(a_this, op)(other, *args, **kwargs)
+        return data, this.index
+    if geo_result:
+        line = (
+            f"SELECT ST_AsHEXWKB({st_function}("
+            "ST_GeomFromWKB(this), ST_GeomFromWKB(other))"
+            ") "
+        )
+
+    else:
+        line = (
+            f"SELECT COALESCE({st_function}("
+            "ST_GeomFromWKB(this), ST_GeomFromWKB(other))"
+            ",false) "
+        )
+
+    values = duckdb.sql(line + "result from read_parquet(temp.parquet)").df()
+    return values.squeeze(axis=1).to_numpy(), this.index
 
 
 def _binary_geo(op, this, other, align, *args, **kwargs):
@@ -94,8 +106,10 @@ def _binary_geo(op, this, other, align, *args, **kwargs):
     """Binary operation on GeoSeries objects that returns a GeoSeries"""
     from .geoseries import GeoSeries
 
-    geoms, index = _delegate_binary_method(op, this, other, align, *args, **kwargs)
-    return GeoSeries(geoms, index=index, crs=this.crs)
+    geoms, index = _delegate_binary_method(
+        op, this, other, align, *args, geo_result=True, **kwargs
+    )
+    return GeoSeries.from_wkb(geoms, index=index, crs=this.crs)
 
 
 def _binary_op(op, this, other, align, *args, **kwargs):
@@ -105,32 +119,79 @@ def _binary_op(op, this, other, align, *args, **kwargs):
     return Series(data, index=index)
 
 
+UNARY_FUNCTION_NAMES = {
+    # "intersects":"ST_Intersects",
+    "is_valid": "ST_IsValid",
+    "is_empty": "ST_IsEmpty",
+    "exterior": "ST_ExteriorRing",
+    "is_ring": "ST_IsRing",
+    "geom_equals": "ST_Equals",
+    "is_ccw": "ST_IsPolygonCCW",
+}
+
+BINARY_FUNCTION_NAMES = {
+    # "intersects":"ST_Intersects",
+    "covered_by": "ST_CoveredBy",  # TODO snake to camel auto?
+    "union": "ST_Union",
+    "geom_equals": "ST_Equals",
+    # TODO lift these out to avoid redundant duckdb exports / calcs
+    "geom_equals_exact": "geopandas",
+    "shared_paths": "geopandas",
+    "project": "geopandas",
+}
+
+UNARY_FUNCTIONS_RETURNING_GEOMETRY = {
+    "exterior",
+    "minimum_bounding_circle",
+    "envelope",
+    "convex_hull",
+    "centroid",
+}
+BINARY_FUNCTIONS_RETURNING_GEOMETRY = {"union"}
+
+
+def function_lookup_unary(op):
+
+    if op in UNARY_FUNCTION_NAMES:
+        return UNARY_FUNCTION_NAMES[op]
+    else:
+        # raise ValueError("missing!")
+        # TODO warn on fallback
+        camel_case = "".join([i.capitalize() for i in op.split("_")])
+        return UNARY_FUNCTION_NAMES.get(op, f"ST_{camel_case}")
+
+
 def _delegate_property(op, this):
     import duckdb
 
-    # type: (str, GeoSeries) -> GeoSeries/Series
-    from .geoseries import GeoSeries
+    # # type: (str, GeoSeries) -> GeoSeries/Series
+    this.geometry.rename("this").to_frame().to_parquet("temp.parquet")
 
-    GeoSeries(this, name="this").to_frame().to_parquet("temp.parquet")
-    # function_map = {
-    #     # "intersects":"ST_Intersects",
-    #     "is_valid": "ST_IsValid"  # TODO snake to camel auto?
-    # }
+    def build_query(
+        function: str, source_data: str, source_column: str = "this"
+    ) -> tuple[str, bool]:
+        st_func = function_lookup_unary(op)
+        sql = f"{st_func}(ST_GeomFromWKB({source_column}))"
+        geom_result = function in UNARY_FUNCTIONS_RETURNING_GEOMETRY
+        if geom_result:
+            # TODO try ST_Read keep_wkb option?
+            sql = f"ST_AsHEXWKB({sql})"
+        sql = f"SELECT {sql} result FROM {source_data}"
+        return sql, geom_result
 
     duckdb.sql("INSTALL spatial;")
     duckdb.sql("LOAD spatial;")
-    values = (
-        duckdb.sql(
-            "SELECT ST_IsValid(ST_GeomFromWKB(this)) "
-            "result from read_parquet(temp.parquet)"
-        )
-        .df()
-        .squeeze()
+    sql, geom_result = build_query(
+        op, source_data="read_parquet(temp.parquet)", source_column="this"
     )
-    from .geoseries import GeoSeries
+    values = duckdb.sql(sql).df().squeeze(axis=1)
+    if geom_result:
+        from .geoseries import GeoSeries
 
-    result = Series(values.array, index=this.index)
-    return result
+        return GeoSeries.from_wkb(values, index=this.index, crs=this.crs)
+    else:
+        result = Series(values.array, index=this.index)
+        return result
     a_this = GeometryArray(this.geometry.values)
 
     data = getattr(a_this, op)
@@ -1518,6 +1579,7 @@ GeometryCollection
         --------
         GeoSeries.exterior : outer boundary
         """
+        # https://postgis.net/docs/ST_InteriorRingN.html, could use, not worth?
         return _delegate_property("interiors", self)
 
     def remove_repeated_points(self, tolerance=0.0):
@@ -6074,7 +6136,7 @@ GeometryCollection
             geometry_input = self.geometry.union_all()
         else:
             geometry_input = shapely.geometrycollections(self.geometry.values._data)
-
+        # TODO ST_BuildArea
         polygons = shapely.build_area(geometry_input)
         return GeoSeries(polygons, crs=self.crs, name="polygons").explode(
             ignore_index=True
