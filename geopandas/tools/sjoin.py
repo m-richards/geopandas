@@ -162,14 +162,17 @@ def sjoin(
     left_df.columns = left_column_names
     right_df.columns = right_column_names
 
+    idx_none = left_df.index.name is None
+    if idx_none and how == "right":
+        left_df = left_df.reset_index()
+        left_df = left_df.rename(columns={"index": "index_left"})
     left_df.to_parquet("left.parquet")
 
-    if right_df.index.name is None:
-        right_df.reset_index().rename(columns={"index": "index_right"}).to_parquet(
-            "right.parquet"
-        )
-    else:
-        right_df.reset_index().to_parquet("right.parquet")
+    idx_none = right_df.index.name is None
+    if idx_none and how != "right":
+        right_df = right_df.reset_index()
+        right_df = right_df.rename(columns={"index": "index_right"})
+    right_df.to_parquet("right.parquet")
 
     geom_name_map = {  # noqa: F841 duckdb
         left_df.geometry.name: "geom_left",
