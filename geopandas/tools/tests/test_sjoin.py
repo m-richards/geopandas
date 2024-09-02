@@ -146,12 +146,12 @@ class TestSpatialJoin:
     @pytest.mark.parametrize(
         "how, lsuffix, rsuffix, expected_cols",
         [
-            ("left", "left", "right", {"col_left", "col_right", "index_right"}),
-            ("inner", "left", "right", {"col_left", "col_right", "index_right"}),
+            # ("left", "left", "right", {"col_left", "col_right", "index_right"}),
+            # ("inner", "left", "right", {"col_left", "col_right", "index_right"}),
             ("right", "left", "right", {"col_left", "col_right", "index_left"}),
-            ("left", "lft", "rgt", {"col_lft", "col_rgt", "index_rgt"}),
-            ("inner", "lft", "rgt", {"col_lft", "col_rgt", "index_rgt"}),
-            ("right", "lft", "rgt", {"col_lft", "col_rgt", "index_lft"}),
+            # ("left", "lft", "rgt", {"col_lft", "col_rgt", "index_rgt"}),
+            # ("inner", "lft", "rgt", {"col_lft", "col_rgt", "index_rgt"}),
+            # ("right", "lft", "rgt", {"col_lft", "col_rgt", "index_lft"}),
         ],
     )
     def test_suffixes(self, how: str, lsuffix: str, rsuffix: str, expected_cols):

@@ -5,7 +5,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from geopandas import GeoDataFrame
+from geopandas import GeoDataFrame, GeoSeries
 from geopandas._compat import PANDAS_GE_30
 from geopandas.array import _check_crs, _crs_mismatch_warn
 
@@ -129,7 +129,110 @@ def sjoin(
         on_attribute=on_attribute,
     )
 
-    return joined
+    #
+    # def build_query(
+    #     function: str, source_data: str, source_column: str = "this"
+    # ) -> tuple[str, bool]:
+    #     st_func = function_lookup_unary(op)
+    #     sql = f"{st_func}(ST_GeomFromWKB({source_column}))"
+    #     geom_result = function in UNARY_FUNCTIONS_RETURNING_GEOMETRY
+    #     if geom_result:
+    #         # TODO try ST_Read keep_wkb option?
+    #         sql = f"ST_AsHEXWKB({sql})"
+    #     sql = f"SELECT {sql} result FROM {source_data}"
+    #     return sql, geom_result
+    import duckdb
+
+    duckdb.sql("INSTALL spatial;")
+    duckdb.sql("LOAD spatial;")
+    # con = duckdb.connect()
+    # con.install_extension("spatial")
+    # con.load_extension("spatial")
+    # sql, geom_result = build_query(
+    #     op, source_data="read_parquet(temp.parquet)", source_column="this"
+    # )
+    # TODO replace this?
+    left_column_names, right_column_names = _process_column_names_with_suffix(
+        left_df.columns,
+        right_df.columns,
+        (lsuffix, rsuffix),
+        left_df,
+        right_df,
+    )
+    left_df.columns = left_column_names
+    right_df.columns = right_column_names
+
+    left_df.to_parquet("left.parquet")
+
+    if right_df.index.name is None:
+        right_df.reset_index().rename(columns={"index": "index_right"}).to_parquet(
+            "right.parquet"
+        )
+    else:
+        right_df.reset_index().to_parquet("right.parquet")
+
+    geom_name_map = {  # noqa: F841 duckdb
+        left_df.geometry.name: "geom_left",
+        right_df.geometry.name: "geom_right",
+    }
+    left = duckdb.sql(  # noqa: F841 duckdb
+        "SELECT ST_GeomFromWKB(geometry) geom_left, "
+        "* from read_parquet('left.parquet')"
+    )
+    right = duckdb.sql(  # noqa: F841 duckdb
+        "SELECT ST_GeomFromWKB(geometry) geom_right, "
+        "* FROM read_parquet('right.parquet')"
+    )
+
+    predicate_map = {
+        "intersects": "ST_Intersects",
+        "contains": "ST_Contains",
+        "within": "ST_Within",
+        # "intersects":"ST_Intersects",
+    }
+    join_type_map = {"inner": "", "left": "LEFT ", "right": "RIGHT "}
+
+    predicate_st = predicate_map[predicate]
+    join_sql = join_type_map[how]
+
+    sql = f"""
+        SELECT * EXCLUDE geometry from 'left'
+        {join_sql}JOIN (SELECT * EXCLUDE geometry from 'right')
+        ON {predicate_st}(geom_left, geom_right)
+        """
+    res = duckdb.sql(sql)
+    geometry_columns = (
+        duckdb.sql(
+            """SELECT column_name FROM (DESCRIBE SELECT * FROM res)
+            WHERE column_type='GEOMETRY'; """
+        )
+        .df()
+        .squeeze()
+        .to_list()
+    )
+    columns = [
+        col if col not in geometry_columns else f"ST_AsHEXWKB({col}) {col}"
+        for col in res.columns
+    ]
+    final_res = duckdb.sql("SELECT " + ", ".join(columns) + " FROM res")
+    gdf = final_res.df()
+    for c in geometry_columns:
+        gdf[c] = GeoSeries.from_wkb(gdf[c])  # TODO CRS
+    if left_df.geometry.name == right_df.geometry.name:
+        # TODO this is a behaviour I would like to change?
+        gdf = gdf.drop(columns="geom_right")
+        gdf = gdf.rename(columns={"geom_left": left_df.geometry.name})
+    else:
+        gdf = gdf.rename(
+            columns={
+                "geom_left": left_df.geometry.name,
+                "geom_right": right_df.geometry.name,
+            }
+        )
+    gdf = GeoDataFrame(gdf, geometry=left_df.geometry.name)  # TODO how=right
+
+    print("")
+    return gdf
 
 
 def _maybe_make_list(obj):
