@@ -191,6 +191,12 @@ def sjoin(
         "intersects": "ST_Intersects",
         "contains": "ST_Contains",
         "within": "ST_Within",
+        "covered_by": "ST_CoveredBy",
+        "covers": "ST_Covers",
+        "touches": "ST_Touches",
+        "contains_properly": "ST_ContainsProperly",
+        "crosses": "ST_Crosses",
+        # "dwithin": "ST_DWithin", # TODO needs special treatment, takes an argument
         # "intersects":"ST_Intersects",
     }
     join_type_map = {"inner": "", "left": "LEFT ", "right": "RIGHT "}
