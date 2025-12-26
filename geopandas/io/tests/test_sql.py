@@ -468,8 +468,8 @@ class TestIO:
         # and additional_geom_cols
         with pytest.raises(
             ValueError,
-            match="Active geometry colum, geometry, should not be listed "
-            "as an additional_geom_cols.",
+            match="Active geometry column, 'geometry', should not be listed "
+            "in additional_geom_cols.",
         ):
             df = read_postgis(
                 sql,

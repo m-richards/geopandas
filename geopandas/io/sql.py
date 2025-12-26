@@ -54,11 +54,11 @@ def _df_to_geodf(df, geom_col="geom", additional_geom_cols=None, crs=None, con=N
     df : DataFrame
         pandas DataFrame with geometry column in WKB representation.
     geom_col : string, default 'geom'
-        column name to convert to shapely geometries
+        column name to convert to shapely geometries and set as active geometry column
     additional_geom_cols : list[str], default None
-        additional geometry columns to be converted to shapely geometries,
-        columns listed here will not be converted to the active geometry column.
-        The active geometry column (geom_col) should not be duplicated here.
+        geometry columns to be converted to shapely geometries, in addition to
+        `geom_col` which is is the active geometry column. `geom_col` 
+        should not be duplicated here.
     crs : pyproj.CRS, optional
         CRS to use for the returned GeoDataFrame. The value can be anything accepted
         by :meth:`pyproj.CRS.from_user_input() <pyproj.crs.CRS.from_user_input>`,
@@ -81,24 +81,23 @@ def _df_to_geodf(df, geom_col="geom", additional_geom_cols=None, crs=None, con=N
             "one geometry column is allowed."
         )
 
-    df, active_geometry = _convert_geometry_column_to_shapely_geometries(df, geom_col)
+    df = _convert_geometry_column_to_shapely_geometries(df, geom_col)
+    active_geometry = df[geom_col]
 
     if additional_geom_cols is not None:
         if geom_col in additional_geom_cols:
             raise ValueError(
-                f"Active geometry colum, {geom_col}, should not be "
-                "listed as an additional_geom_cols."
+                f"Active geometry column, {geom_col!r}, should not be "
+                "listed in additional_geom_cols."
             )
 
         for additional_geom_col in additional_geom_cols:
             if additional_geom_col not in df:
                 raise ValueError(
-                    f"Missing additional geometry column {additional_geom_col}"
-                    "in query."
+                    f"Supplied additional geometry column {additional_geom_col!r}"
+                    "in not returned in SQL query output."
                 )
-            df, _ = _convert_geometry_column_to_shapely_geometries(
-                df, additional_geom_col
-            )
+            df = _convert_geometry_column_to_shapely_geometries(df, additional_geom_col)
 
     if not active_geometry.empty:
         if crs is None:
@@ -131,7 +130,7 @@ def _df_to_geodf(df, geom_col="geom", additional_geom_cols=None, crs=None, con=N
     return GeoDataFrame(df, crs=crs, geometry=geom_col)
 
 
-def _convert_geometry_column_to_shapely_geometries(df, geometry_column_name):
+def _convert_geometry_column_to_shapely_geometries(df, geometry_column_name:str):
     geometry = df[geometry_column_name].dropna()
 
     if not geometry.empty:
@@ -155,7 +154,7 @@ def _convert_geometry_column_to_shapely_geometries(df, geometry_column_name):
             )
         df[geometry_column_name] = geometry
 
-    return df, geometry
+    return df
 
 
 def _read_postgis(
