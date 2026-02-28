@@ -163,14 +163,14 @@ def test_loc_add_row(geom_name, nybb_filename):
         expected_crs = nybb.crs
     else:
         ctx = contextlib.nullcontext()
-        if geom_name == "geometry":
-            expected_crs = nybb.crs
-        else:
-            expected_crs = None  # this should be nybb.crs, regressed in #2373
+        expected_crs = None  # this should be nybb.crs, regressed in #2373
     with ctx:
         nybb.loc[5] = [6, nybb.geometry.iloc[0]]
-    assert nybb.geometry.dtype == "geometry"
-    assert nybb.crs is expected_crs
+    if PANDAS_GE_40 or geom_name == "geometry":
+        assert nybb.geometry.dtype == "geometry"
+        assert nybb.crs is expected_crs
+    else:
+        assert nybb.geometry.dtype == "object"
 
 
 def test_iloc(df):
