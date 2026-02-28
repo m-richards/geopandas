@@ -7,7 +7,7 @@ from shapely.geometry import Point
 
 import geopandas
 from geopandas import GeoDataFrame, GeoSeries
-from geopandas._compat import PANDAS_GE_40
+from geopandas._compat import PANDAS_GE_31
 
 import pytest
 from geopandas.testing import assert_geodataframe_equal
@@ -158,15 +158,15 @@ def test_loc_add_row(geom_name, nybb_filename):
     if geom_name != "geometry":
         nybb = nybb.rename_geometry(geom_name)
     # add a new row
-    if PANDAS_GE_40:
-        ctx = pytest.warns(UserWarning, match="CRS not set for some")
+    if PANDAS_GE_31:
+        ctx = pytest.warns(UserWarning, match="CRS not set for some.*")
         expected_crs = nybb.crs
     else:
         ctx = contextlib.nullcontext()
         expected_crs = None  # this should be nybb.crs, regressed in #2373
     with ctx:
         nybb.loc[5] = [6, nybb.geometry.iloc[0]]
-    if PANDAS_GE_40 or geom_name == "geometry":
+    if PANDAS_GE_31 or geom_name == "geometry":
         assert nybb.geometry.dtype == "geometry"
         assert nybb.crs is expected_crs
     else:
