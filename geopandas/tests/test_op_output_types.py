@@ -6,7 +6,7 @@ from shapely.geometry import Point
 
 import geopandas
 from geopandas import GeoDataFrame, GeoSeries
-from geopandas._compat import PANDAS_GE_31
+from geopandas._compat import PANDAS_GE_30, PANDAS_GE_31
 
 import pytest
 from geopandas.testing import assert_geodataframe_equal
@@ -169,6 +169,7 @@ def test_loc_add_row(geom_name, nybb_filename):
         assert nybb.geometry.dtype == "object"
 
 
+@pytest.mark.skipif(not PANDAS_GE_30, reason="fixed in Pandas >= 3.0")
 @pytest.mark.parametrize("geom_name", ["geometry", "geom"])
 def test_loc_add_row_empty_df(geom_name):
     # https://github.com/geopandas/geopandas/issues/3109
