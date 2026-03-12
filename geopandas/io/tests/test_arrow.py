@@ -352,6 +352,7 @@ def test_to_parquet_does_not_pass_engine_along(mock_to_parquet):
         index=None,
         schema_version=None,
         write_covering_bbox=False,
+        partition_cols=None,
     )
 
 
@@ -1437,3 +1438,45 @@ def test_read_parquet_from_https():
     path = "https://github.com/opengeospatial/geoparquet/raw/refs/heads/main/test_data/data-polygon-encoding_wkb.parquet"
     df = geopandas.read_parquet(path)
     assert df.shape == (4, 2)
+
+
+def test_to_parquet_partition_cols(tmp_path):
+    df = GeoDataFrame(
+        {
+            "name": ["a", "b", "c", "d"],
+            "partition_col": [1, 1, 2, 2],
+            "geometry": [Point(0, 0), Point(1, 1), Point(2, 2), Point(3, 3)],
+        },
+        crs="EPSG:4326",
+    )
+    output_dir = tmp_path / "partitioned"
+    df.to_parquet(output_dir, partition_cols=["partition_col"])
+
+    assert output_dir.is_dir()
+    assert (output_dir / "partition_col=1").is_dir()
+    assert (output_dir / "partition_col=2").is_dir()
+
+    # check metadata in one of the partitioned files
+    partition_file = next(iter((output_dir / "partition_col=1").glob("*.parquet")))
+    table = pq.read_table(partition_file)
+    assert b"geo" in table.schema.metadata
+    geo_metadata = json.loads(table.schema.metadata[b"geo"].decode("utf-8"))
+    assert "primary_column" in geo_metadata
+    assert "geometry" in geo_metadata["columns"]
+    assert geo_metadata["columns"]["geometry"]["geometry_types"] == ["Point"]
+    assert "crs" in geo_metadata["columns"]["geometry"]
+
+    # read back
+    result = geopandas.read_parquet(output_dir)
+    # pyarrow read_to_dataset might change row order or index, but here it's simple
+    # The partition column is added back as a categorical or integer column
+    # We convert partition_col to the same type to avoid Categorical vs ndarray issues
+    result["partition_col"] = result["partition_col"].astype(df["partition_col"].dtype)
+
+    # Use check_like=True to ignore column order
+    assert_geodataframe_equal(
+        result.sort_values("name").reset_index(drop=True),
+        df.reset_index(drop=True),
+        check_dtype=False,
+        check_like=True,
+    )

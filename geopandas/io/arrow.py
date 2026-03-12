@@ -390,6 +390,7 @@ def _to_parquet(
     geometry_encoding="WKB",
     schema_version=None,
     write_covering_bbox=False,
+    partition_cols=None,
     **kwargs,
 ):
     """
@@ -429,8 +430,12 @@ def _to_parquet(
         Writes the bounding box column for each row entry with column
         name 'bbox'. Writing a bbox column can be computationally
         expensive, hence is default setting is False.
+    partition_cols : list, optional, default None
+        Column names by which to partition the dataset.
+        Columns are partitioned in the order they are given.
     **kwargs
-        Additional keyword arguments passed to pyarrow.parquet.write_table().
+        Additional keyword arguments passed to pyarrow.parquet.write_table()
+        or pyarrow.parquet.write_to_dataset().
     """
     parquet = import_optional_dependency(
         "pyarrow.parquet", extra="pyarrow is required for Parquet support."
@@ -444,7 +449,16 @@ def _to_parquet(
         schema_version=schema_version,
         write_covering_bbox=write_covering_bbox,
     )
-    parquet.write_table(table, path, compression=compression, **kwargs)
+    if partition_cols is not None:
+        parquet.write_to_dataset(
+            table,
+            path,
+            compression=compression,
+            partition_cols=partition_cols,
+            **kwargs,
+        )
+    else:
+        parquet.write_table(table, path, compression=compression, **kwargs)
 
 
 def _to_feather(df, path, index=None, compression=None, schema_version=None, **kwargs):
