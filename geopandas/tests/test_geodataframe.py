@@ -1289,7 +1289,9 @@ class TestConstructor:
             check_geodataframe(res)
 
             expected_index = (
-                pd.RangeIndex(2) if compat.PANDAS_GE_30 else pd.Index([0, 2])
+                pd.RangeIndex(stop=4, step=2)
+                if compat.PANDAS_GE_30
+                else pd.Index([0, 2])
             )
             assert_index_equal(res.index, expected_index, exact=True)
             assert res["A"].tolist() == [0, 2]
