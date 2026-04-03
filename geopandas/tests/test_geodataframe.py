@@ -694,7 +694,7 @@ class TestDataFrame:
         df = GeoDataFrame.from_features([f1, f2, f3])
 
         result = df[["a", "b"]]
-        expected = pd.DataFrame.from_dict(
+        expected = pd.DataFrame(
             [{"a": 0, "b": np.nan}, {"a": np.nan, "b": 1}, {"a": np.nan, "b": np.nan}]
         )
         assert_frame_equal(expected, result)
