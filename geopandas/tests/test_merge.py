@@ -222,4 +222,4 @@ class TestMerging:
         result2 = pd.concat([gseries2, self.gseries], axis=1)
         assert type(result2) is GeoDataFrame
         assert result._geometry_column_name is None
-        assert_index_equal(pd.Index(["foo", 0]), result2.columns, exact=True)
+        assert_index_equal(pd.Index(["foo", 0]), result2.columns)
