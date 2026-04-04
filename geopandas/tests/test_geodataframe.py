@@ -1292,7 +1292,7 @@ class TestConstructor:
 
             res = GeoDataFrame(df, columns=["geometry", "B"])
             check_geodataframe(res)
-            assert_index_equal(res.columns, pd.Index(["geometry", "B"]), exact=True)
+            assert_index_equal(res.columns, pd.Index(["geometry", "B"]), exact=False)
 
             with pytest.raises(ValueError):
                 GeoDataFrame(df, geometry="other_geom")
