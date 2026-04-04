@@ -7,6 +7,7 @@ from http import HTTPStatus
 from io import IOBase
 from packaging.version import Version
 from pathlib import Path
+from typing import Any
 
 # Adapted from pandas.io.common
 from urllib.parse import urlparse as parse_url
@@ -895,7 +896,7 @@ def _list_layers(filename) -> pd.DataFrame:
     )
 
 
-def _read_file_info(filename, layer=None) -> dict:
+def _read_file_info(filename, layer=None) -> dict[str, Any]:
     """Read layer information from a file.
 
     Parameters
