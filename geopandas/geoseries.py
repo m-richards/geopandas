@@ -239,7 +239,7 @@ class GeoSeries(GeoPandasBase, Series):
                 "This unsafe behavior will be deprecated in future versions. "
                 "Use GeoSeries.set_crs method instead.",
                 stacklevel=2,
-                category=DeprecationWarning,
+                category=FutureWarning,
             )
         self.geometry.values.crs = value
 
@@ -603,7 +603,7 @@ class GeoSeries(GeoPandasBase, Series):
                 data = data.reindex(index)
             else:
                 index = data.index
-            data = data.values
+            data = data.to_numpy(na_value=None)
         return cls(
             from_wkb_or_wkt_function(data, crs=crs, on_invalid=on_invalid),
             index=index,
@@ -613,7 +613,7 @@ class GeoSeries(GeoPandasBase, Series):
     @classmethod
     def from_arrow(cls, arr, **kwargs) -> GeoSeries:
         """
-        Construct a GeoSeries from a Arrow array object with a GeoArrow
+        Construct a GeoSeries from an Arrow array object with a GeoArrow
         extension type.
 
         See https://geoarrow.org/ for details on the GeoArrow specification.
@@ -640,6 +640,22 @@ class GeoSeries(GeoPandasBase, Series):
         -------
         GeoSeries
 
+
+        See Also
+        --------
+        GeoSeries.to_arrow
+
+        Examples
+        --------
+        >>> import geoarrow.pyarrow as ga
+        >>> array = ga.as_geoarrow(
+        ... [None, "POLYGON ((0 0, 1 1, 0 1, 0 0))", "LINESTRING (0 0, -1 1, 0 -1)"])
+        >>> geoseries = geopandas.GeoSeries.from_arrow(array)
+        >>> geoseries
+        0                              None
+        1    POLYGON ((0 0, 1 1, 0 1, 0 0))
+        2      LINESTRING (0 0, -1 1, 0 -1)
+        dtype: geometry
         """
         from geopandas.io._geoarrow import arrow_to_geometry_array
 
@@ -790,11 +806,6 @@ class GeoSeries(GeoPandasBase, Series):
     def apply(self, func, convert_dtype: bool | None = None, args=(), **kwargs):
         if convert_dtype is not None:
             kwargs["convert_dtype"] = convert_dtype
-        else:
-            # if compat.PANDAS_GE_21 don't pass through, use pandas default
-            # of true to avoid internally triggering the pandas warning
-            if not compat.PANDAS_GE_21:
-                kwargs["convert_dtype"] = True
 
         # to avoid warning
         result = super().apply(func, args=args, **kwargs)
@@ -1165,7 +1176,7 @@ class GeoSeries(GeoPandasBase, Series):
                 "transform the geometries, use 'GeoSeries.to_crs' instead."
             )
         if not inplace:
-            result = self.copy()
+            result = self.copy(deep=not compat.PANDAS_GE_30)
         else:
             result = self
         result.array.crs = crs
@@ -1389,8 +1400,8 @@ e": "Feature", "properties": {}, "geometry": {"type": "Point", "coordinates": [3
         0           010100000000000000000000000000000000000000
         1                                   010300000000000000
         2    0103000000010000000400000000000000000000000000...
-        3                                                 None
-        dtype: object
+        3                                                  NaN
+        dtype: str
         """
         return Series(to_wkb(self.array, hex=hex, **kwargs), index=self.index)
 
@@ -1421,7 +1432,7 @@ e": "Feature", "properties": {}, "geometry": {"type": "Point", "coordinates": [3
         0    POINT (1 1)
         1    POINT (2 2)
         2    POINT (3 3)
-        dtype: object
+        dtype: str
 
         See Also
         --------
@@ -1487,11 +1498,9 @@ e": "Feature", "properties": {}, "geometry": {"type": "Point", "coordinates": [3
         >>> import pyarrow as pa
         >>> array = pa.array(arrow_array)
         >>> array
-        <pyarrow.lib.BinaryArray object at ...>
-        [
-          0101000000000000000000F03F0000000000000040,
-          01010000000000000000000040000000000000F03F
-        ]
+        GeometryExtensionArray:WkbType(geoarrow.wkb)[2]
+        <POINT (1 2)>
+        <POINT (2 1)>
 
         """
         from geopandas.io._geoarrow import (

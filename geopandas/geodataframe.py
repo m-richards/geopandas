@@ -119,7 +119,7 @@ class GeoDataFrame(GeoPandasBase, DataFrame):
     Notice that the inferred dtype of 'geometry' columns is geometry.
 
     >>> gdf.dtypes
-    col1          object
+    col1             str
     geometry    geometry
     dtype: object
 
@@ -169,6 +169,9 @@ class GeoDataFrame(GeoPandasBase, DataFrame):
             kwargs["columns"] = pd.Index([], dtype="str")
 
         super().__init__(data, *args, **kwargs)
+
+        if isinstance(data, DataFrame) and data.attrs:
+            self.attrs = data.attrs
 
         # set_geometry ensures the geometry data have the proper dtype,
         # but is not called if `geometry=None` ('geometry' column present
@@ -446,6 +449,8 @@ class GeoDataFrame(GeoPandasBase, DataFrame):
                 )
             if drop:
                 del frame[col]
+                frame.__class__ = GeoDataFrame
+                # revert the casting done in __delitem__, keep gdf
                 warnings.warn(
                     given_colname_drop_msg,
                     category=FutureWarning,
@@ -610,7 +615,7 @@ class GeoDataFrame(GeoPandasBase, DataFrame):
                     "This unsafe behavior will be deprecated in future versions. "
                     "Use GeoDataFrame.set_crs method instead",
                     stacklevel=2,
-                    category=DeprecationWarning,
+                    category=FutureWarning,
                 )
             self.geometry.values.crs = value
         else:
@@ -908,7 +913,7 @@ class GeoDataFrame(GeoPandasBase, DataFrame):
         cls, table, geometry: str | None = None, to_pandas_kwargs: dict | None = None
     ):
         """
-        Construct a GeoDataFrame from a Arrow table object based on GeoArrow
+        Construct a GeoDataFrame from an Arrow table object based on GeoArrow
         extension types.
 
         See https://geoarrow.org/ for details on the GeoArrow specification.
@@ -942,6 +947,28 @@ class GeoDataFrame(GeoPandasBase, DataFrame):
         -------
         GeoDataFrame
 
+        See Also
+        --------
+        GeoDataFrame.to_arrow
+        GeoSeries.from_arrow
+
+        Examples
+        --------
+        >>> import geoarrow.pyarrow as ga
+        >>> import pyarrow as pa
+        >>> table = pa.Table.from_arrays([
+        ...     ga.as_geoarrow(
+        ...     [None, "POLYGON ((0 0, 1 1, 0 1, 0 0))", "LINESTRING (0 0, -1 1, 0 -1)"]
+        ...     ),
+        ...     pa.array([1, 2, 3]),
+        ...     pa.array(["a", "b", "c"]),
+        ... ], names=["geometry", "id", "value"])
+        >>> gdf = geopandas.GeoDataFrame.from_arrow(table)
+        >>> gdf
+                                   geometry   id  value
+        0                              None    1      a
+        1    POLYGON ((0 0, 1 1, 0 1, 0 0))    2      b
+        2      LINESTRING (0 0, -1 1, 0 -1)    3      c
         """
         from geopandas.io._geoarrow import arrow_to_geopandas
 
@@ -1124,14 +1151,8 @@ individually so that features may have different properties
         if na not in ["null", "drop", "keep"]:
             raise ValueError(f"Unknown na method {na}")
 
-        if self._geometry_column_name not in self:
-            raise AttributeError(
-                "No geometry data set (expected in column "
-                f"'{self._geometry_column_name}')."
-            )
-
         ids = np.asarray(self.index)
-        geometries = np.asarray(self[self._geometry_column_name])
+        geometries = np.asarray(self.geometry)
 
         if not self.columns.is_unique:
             raise ValueError("GeoDataFrame cannot contain duplicated column names.")
@@ -1266,7 +1287,7 @@ properties': {'col1': 'name1'}, 'geometry': {'type': 'Point', 'coordinates': (1.
         DataFrame
             geometry columns are encoded to WKB
         """
-        df = DataFrame(self.copy())
+        df = DataFrame(self.copy(deep=not PANDAS_GE_30))
 
         # Encode all geometry columns to WKB
         for col in df.columns[df.dtypes == "geometry"]:
@@ -1288,7 +1309,7 @@ properties': {'col1': 'name1'}, 'geometry': {'type': 'Point', 'coordinates': (1.
         DataFrame
             geometry columns are encoded to WKT
         """
-        df = DataFrame(self.copy())
+        df = DataFrame(self.copy(deep=not PANDAS_GE_30))
 
         # Encode all geometry columns to WKT
         for col in df.columns[df.dtypes == "geometry"]:
@@ -1370,8 +1391,8 @@ properties': {'col1': 'name1'}, 'geometry': {'type': 'Point', 'coordinates': (1.
         >>> table = pa.table(arrow_table)
         >>> table
         pyarrow.Table
-        col1: string
-        geometry: binary
+        col1: large_string
+        geometry: extension<geoarrow.wkb<WkbType>>
         ----
         col1: [["name1","name2"]]
         geometry: [[0101000000000000000000F03F0000000000000040,\
@@ -1732,7 +1753,7 @@ default 'snappy'
 
         """
         if not inplace:
-            df = self.copy()
+            df = self.copy(deep=not PANDAS_GE_30)
         else:
             df = self
         df.geometry = df.geometry.set_crs(
@@ -1840,7 +1861,7 @@ default 'snappy'
         if inplace:
             df = self
         else:
-            df = self.copy()
+            df = self.copy(deep=not PANDAS_GE_30)
         geom = df.geometry.to_crs(crs=crs, epsg=epsg)
         df.geometry = geom
         if not inplace:
@@ -1914,6 +1935,12 @@ default 'snappy'
             else:
                 result.__class__ = DataFrame
         return result
+
+    def __delitem__(self, key) -> None:
+        """If the last geometry column is removed, downcast to a dataframe."""
+        super().__delitem__(key)
+        if (self.dtypes == "geometry").sum() == 0:
+            self.__class__ = DataFrame
 
     def _persist_old_default_geometry_colname(self) -> None:
         """Persist the default geometry column name of 'geometry' temporarily for

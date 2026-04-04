@@ -2,6 +2,7 @@ import json
 import os
 import pathlib
 import re
+from io import BytesIO
 from itertools import product
 from packaging.version import Version
 
@@ -406,6 +407,32 @@ def test_roundtrip(tmpdir, file_format, test_dataset, request):
 
     # make sure that we can roundtrip the data frame
     pq_df = reader(filename)
+
+    assert isinstance(pq_df, GeoDataFrame)
+    assert_geodataframe_equal(df, pq_df)
+
+
+@pytest.mark.parametrize(
+    "test_dataset", ["naturalearth_lowres", "naturalearth_cities", "nybb_filename"]
+)
+def test_roundtrip_bytesio(file_format, test_dataset, request):
+    """Should be able to roundtrip in BytesIO."""
+    path = request.getfixturevalue(test_dataset)
+    reader, writer = file_format
+
+    df = read_file(path)
+    orig = df.copy()
+
+    buf = BytesIO()
+
+    writer(df, buf)
+    buf.seek(0)
+
+    # make sure that the original data frame is unaltered
+    assert_geodataframe_equal(df, orig)
+
+    # make sure that we can roundtrip the data frame
+    pq_df = reader(BytesIO(buf.getvalue()))
 
     assert isinstance(pq_df, GeoDataFrame)
     assert_geodataframe_equal(df, pq_df)
@@ -1170,7 +1197,7 @@ def test_read_parquet_bbox(tmpdir, naturalearth_lowres, geometry_name):
 
 @pytest.mark.parametrize("geometry_name", ["geometry", "custum_geom_col"])
 def test_read_parquet_bbox_partitioned(tmpdir, naturalearth_lowres, geometry_name):
-    # check bbox is being used to filter results on partioned data.
+    # check bbox is being used to filter results on partitioned data.
     df = read_file(naturalearth_lowres)
     if geometry_name != "geometry":
         df = df.rename_geometry(geometry_name)
@@ -1376,15 +1403,37 @@ def test_read_parquet_bbox_points(tmp_path):
 def test_non_geo_parquet_read_with_proper_error(tmp_path):
     # https://github.com/geopandas/geopandas/issues/3556
 
-    gdf = geopandas.GeoDataFrame(
+    gdf = GeoDataFrame(
         {"col": [1, 2, 3]},
         geometry=geopandas.points_from_xy([1, 2, 3], [1, 2, 3]),
         crs="EPSG:4326",
     )
     del gdf["geometry"]
+    # for the purposes of testing, force a situation where gdf will be written without
+    # a geometry column (but with the other metadata)
+    gdf.__class__ = GeoDataFrame
 
     gdf.to_parquet(tmp_path / "test_no_geometry.parquet")
     with pytest.raises(
         ValueError, match="No geometry columns are included in the columns read"
     ):
         geopandas.read_parquet(tmp_path / "test_no_geometry.parquet")
+
+
+def test_save_df_attrs_to_parquet_metadata(tmp_path):
+    gdf = geopandas.GeoDataFrame({"a": ["a"], "b": ["1"], "geometry": [None]})
+    gdf.attrs["test_key"] = "test_value"
+
+    gdf.to_parquet(tmp_path / "gdf.parquet")
+
+    gdf2 = geopandas.read_parquet(tmp_path / "gdf.parquet")
+    assert gdf2.attrs == {"test_key": "test_value"}
+
+
+def test_read_parquet_from_https():
+    _ = pytest.importorskip("fsspec")
+    _ = pytest.importorskip("requests")
+    _ = pytest.importorskip("aiohttp")
+    path = "https://github.com/opengeospatial/geoparquet/raw/refs/heads/main/test_data/data-polygon-encoding_wkb.parquet"
+    df = geopandas.read_parquet(path)
+    assert df.shape == (4, 2)

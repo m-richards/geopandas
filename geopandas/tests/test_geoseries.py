@@ -159,7 +159,6 @@ class TestSeries:
             self.a1.geom_equals_exact(self.a2, 0.001, align=False), [False, False]
         )
 
-    @pytest.mark.skipif(not compat.SHAPELY_GE_21, reason="requires Shapely>=2.1")
     def test_geom_equals_identical(self):
         assert np.all(self.g1.geom_equals_identical(self.g1))
         assert_array_equal(self.g1.geom_equals_identical(self.sq), [False, True])
@@ -372,6 +371,12 @@ class TestSeries:
         expected = self.g1.reindex(index)
         assert_geoseries_equal(expected, GeoSeries.from_wkb(s, index=index))
 
+    def test_from_wkb_with_missing(self):
+        s = pd.Series([self.t1.wkb, None, self.sq.wkb])
+        result = GeoSeries.from_wkb(s)
+        expected = GeoSeries([self.t1, None, self.sq])
+        assert_geoseries_equal(result, expected)
+
     def test_from_wkt(self):
         assert_geoseries_equal(self.g1, GeoSeries.from_wkt([self.t1.wkt, self.sq.wkt]))
 
@@ -403,6 +408,19 @@ class TestSeries:
         s = pd.Series([self.t1.wkt, self.sq.wkt], index=[0, 2])
         expected = self.g1.reindex(index)
         assert_geoseries_equal(expected, GeoSeries.from_wkt(s, index=index))
+
+    def test_from_wkt_with_missing(self):
+        s = pd.Series([self.t1.wkt, None, self.sq.wkt])
+        result = GeoSeries.from_wkt(s)
+        expected = GeoSeries([self.t1, None, self.sq])
+        assert_geoseries_equal(result, expected)
+
+    @pytest.mark.parametrize("missing_value", [None, np.nan, pd.NA])
+    def test_from_wkt_with_missing_object(self, missing_value):
+        s = pd.Series([self.t1.wkt, missing_value, self.sq.wkt], dtype="object")
+        result = GeoSeries.from_wkt(s)
+        expected = GeoSeries([self.t1, None, self.sq])
+        assert_geoseries_equal(result, expected)
 
     def test_to_wkb(self):
         assert_series_equal(pd.Series([self.t1.wkb, self.sq.wkb]), self.g1.to_wkb())
@@ -538,7 +556,7 @@ def test_geoseries_crs():
 def test_geoseries_override_existing_crs_warning():
     gs = GeoSeries(crs="epsg:4326")
     with pytest.warns(
-        DeprecationWarning,
+        FutureWarning,
         match="Overriding the CRS of a GeoSeries that already has CRS",
     ):
         gs.crs = "epsg:2100"
@@ -628,7 +646,7 @@ class TestConstructor:
             np.array([], dtype="float64"),
         ]
 
-        if compat.PANDAS_GE_30 and pd.options.future.infer_string:
+        if compat.PANDAS_INFER_STR:
             # in pandas >=3 future string, str is not converted to object
             # so is non geom compatible
             non_geom_compat_dtypes.append(np.array([], dtype="str"))

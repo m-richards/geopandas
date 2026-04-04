@@ -86,7 +86,7 @@ def test_to_crs_dimension_z():
     assert result.has_z.all()
 
 
-# pyproj + numpy 1.25 trigger warning for single-element array -> recommdation is to
+# pyproj + numpy 1.25 trigger warning for single-element array -> recommendation is to
 # ignore the warning for now (https://github.com/pyproj4/pyproj/issues/1307)
 @pytest.mark.filterwarnings("ignore:Conversion of an array with:DeprecationWarning")
 def test_to_crs_dimension_mixed():
@@ -166,7 +166,7 @@ def test_transform2(epsg4326, epsg26918):
     assert_geodataframe_equal(df, utm, check_less_precise=True, check_crs=False)
 
 
-# pyproj + numpy 1.25 trigger warning for single-element array -> recommdation is to
+# pyproj + numpy 1.25 trigger warning for single-element array -> recommendation is to
 # ignore the warning for now (https://github.com/pyproj4/pyproj/issues/1307)
 @pytest.mark.filterwarnings("ignore:Conversion of an array with:DeprecationWarning")
 def test_crs_axis_order__always_xy():
@@ -717,7 +717,7 @@ class TestSetCRS:
         naive = constructor([Point(0, 0), Point(1, 1)], crs=None)
         assert naive.crs is None
 
-        # by default returns a copy
+        # by default returns a (shallow) copy
         result = naive.set_crs(crs="EPSG:4326")
         assert result.crs == "EPSG:4326"
         assert naive.crs is None
