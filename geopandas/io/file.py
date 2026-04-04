@@ -895,8 +895,8 @@ def _list_layers(filename) -> pd.DataFrame:
     )
 
 
-def _read_layer_metadata(filename, layer=None) -> dict:
-    """Read layer metadata from a file.
+def _read_file_info(filename, layer=None) -> dict:
+    """Read layer information from a file.
 
     Parameters
     ----------
@@ -920,4 +920,4 @@ def _read_layer_metadata(filename, layer=None) -> dict:
 
     import pyogrio
 
-    return pyogrio.read_info(filename, layer=layer).get("layer_metadata")
+    return pyogrio.read_info(filename, layer=layer)
