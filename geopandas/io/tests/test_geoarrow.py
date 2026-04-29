@@ -2,9 +2,9 @@ import contextlib
 import json
 import os
 import pathlib
-from packaging.version import Version
 
 import numpy as np
+from pandas import ArrowDtype
 
 import shapely
 from shapely import MultiPoint, Point, box
@@ -23,17 +23,11 @@ DATA_PATH = pathlib.Path(os.path.dirname(__file__)) / "data"
 
 
 def pa_table(table):
-    if Version(pa.__version__) < Version("14.0.0"):
-        return table._pa_table
-    else:
-        return pa.table(table)
+    return pa.table(table)
 
 
 def pa_array(array):
-    if Version(pa.__version__) < Version("14.0.0"):
-        return array._pa_array
-    else:
-        return pa.array(array)
+    return pa.array(array)
 
 
 def assert_table_equal(left, right, check_metadata=True):
@@ -195,10 +189,20 @@ def test_geoarrow_export(geometry_type, dim, geometry_encoding, interleaved):
     assert result_arr.equals(expected["geometry"].chunk(0))
 
 
-@pytest.mark.skipif(
-    Version(shapely.__version__) < Version("2.0.2"),
-    reason="from_ragged_array failing with read-only array input",
-)
+@pytest.mark.parametrize("encoding", ["WKB", "geoarrow"])
+def test_geoarrow_to_pandas_kwargs(encoding):
+    g = box(0, 0, 10, 10)
+    gdf = GeoDataFrame({"geometry": [g], "i": [1], "s": ["a"]})
+    table = pa_table(gdf.to_arrow(geometry_encoding=encoding))
+    # simulate the `dtype_backend="pyarrow"` option in `pandas.read_parquet`
+    gdf_roundtrip = GeoDataFrame.from_arrow(
+        table, to_pandas_kwargs={"types_mapper": ArrowDtype}
+    )
+    assert isinstance(gdf_roundtrip, GeoDataFrame)
+    assert isinstance(gdf_roundtrip.dtypes["i"], ArrowDtype)
+    assert isinstance(gdf_roundtrip.dtypes["s"], ArrowDtype)
+
+
 @pytest.mark.parametrize("encoding", ["WKB", "geoarrow"])
 def test_geoarrow_multiple_geometry_crs(encoding):
     pytest.importorskip("pyproj")
@@ -210,11 +214,11 @@ def test_geoarrow_multiple_geometry_crs(encoding):
     meta1 = json.loads(
         result.schema.field("geometry").metadata[b"ARROW:extension:metadata"]
     )
-    assert json.loads(meta1["crs"])["id"]["code"] == 4326
+    assert meta1["crs"]["id"]["code"] == 4326
     meta2 = json.loads(
         result.schema.field("geom2").metadata[b"ARROW:extension:metadata"]
     )
-    assert json.loads(meta2["crs"])["id"]["code"] == 3857
+    assert meta2["crs"]["id"]["code"] == 3857
 
     roundtripped = GeoDataFrame.from_arrow(result)
     assert_geodataframe_equal(gdf, roundtripped)
@@ -237,7 +241,7 @@ def test_geoarrow_series_name_crs(encoding):
         else b"geoarrow.polygon"
     )
     meta = json.loads(field.metadata[b"ARROW:extension:metadata"])
-    assert json.loads(meta["crs"])["id"]["code"] == 4326
+    assert meta["crs"]["id"]["code"] == 4326
 
     # ensure it also works without a name
     gser = GeoSeries([box(0, 0, 10, 10)])
@@ -287,18 +291,6 @@ def test_geoarrow_missing(encoding, interleaved, geom_type):
         geometry=[Point(0, 0) if geom_type == "point" else box(0, 0, 10, 10), None],
         crs="epsg:4326",
     )
-    if (
-        encoding == "geoarrow"
-        and geom_type == "point"
-        and interleaved
-        and Version(pa.__version__) < Version("15.0.0")
-    ):
-        with pytest.raises(
-            ValueError,
-            match="Converting point geometries with missing values is not supported",
-        ):
-            gdf.to_arrow(geometry_encoding=encoding, interleaved=interleaved)
-        return
     result = pa_table(gdf.to_arrow(geometry_encoding=encoding, interleaved=interleaved))
     assert result["geometry"].null_count == 1
     assert result["geometry"].is_null().to_pylist() == [False, True]
@@ -391,10 +383,6 @@ def test_geoarrow_export_empty():
     assert_geodataframe_equal(gdf_all_missing, roundtripped)
 
 
-@pytest.mark.skipif(
-    Version(shapely.__version__) < Version("2.0.2"),
-    reason="from_ragged_array failing with read-only array input",
-)
 @pytest.mark.parametrize("dim", ["xy", "xyz"])
 @pytest.mark.parametrize(
     "geometry_type",
@@ -430,10 +418,6 @@ def test_geoarrow_import(geometry_type, dim):
     assert_geodataframe_equal(result3, df)
 
 
-@pytest.mark.skipif(
-    Version(shapely.__version__) < Version("2.0.2"),
-    reason="from_ragged_array failing with read-only array input",
-)
 @pytest.mark.parametrize("encoding", ["WKB", "geoarrow"])
 def test_geoarrow_import_geometry_column(encoding):
     pytest.importorskip("pyproj")

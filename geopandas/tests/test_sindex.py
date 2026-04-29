@@ -1,3 +1,4 @@
+import re
 from math import sqrt
 
 import numpy as np
@@ -18,6 +19,14 @@ from geopandas import _compat as compat
 
 import pytest
 from numpy.testing import assert_array_equal
+
+try:
+    from scipy.sparse import coo_array  # noqa: F401
+
+    HAS_SCIPY = True
+except ImportError:
+    HAS_SCIPY = False
+SCIPY_MARK = pytest.mark.skipif(not HAS_SCIPY, reason="scipy not installed")
 
 
 class TestSeriesSindex:
@@ -91,6 +100,7 @@ class TestSeriesSindex:
         assert sliced.sindex is not original_index
         # Select all rows
         sliced = s.iloc[:]
+        assert sliced.has_sindex
         assert sliced.sindex is original_index
         # Select all rows and flip
         sliced = s.iloc[::-1]
@@ -262,6 +272,9 @@ class TestShapelyInterface:
 
     # ------------------------------ `query` tests ------------------------------ #
     @pytest.mark.parametrize(
+        "output_format", ("indices", pytest.param("sparse", marks=SCIPY_MARK), "dense")
+    )
+    @pytest.mark.parametrize(
         "predicate, test_geom, expected",
         (
             (None, box(-1, -1, -0.5, -0.5), []),  # bbox does not intersect
@@ -359,10 +372,21 @@ class TestShapelyInterface:
             ),  # contains but does not contains_properly
         ),
     )
-    def test_query(self, predicate, test_geom, expected):
+    def test_query(self, predicate, test_geom, expected, output_format):
         """Tests the `query` method with valid inputs and valid predicates."""
         res = self.df.sindex.query(test_geom, predicate=predicate)
         assert_array_equal(res, expected)
+
+        if output_format != "indices":
+            dense = np.zeros(len(self.df), dtype=bool)
+            dense[expected] = True
+
+            res = self.df.sindex.query(
+                test_geom, predicate=predicate, output_format=output_format
+            )
+            if output_format == "sparse":
+                res = res.todense()
+            assert_array_equal(res, dense)
 
     def test_query_invalid_geometry(self):
         """Tests the `query` method with invalid geometry."""
@@ -467,7 +491,7 @@ class TestShapelyInterface:
         incompatible versions of shapely or pyGEOS
         """
         with pytest.raises(
-            ValueError, match="predicate = 'dwithin' requires GEOS >= 3.10.0"
+            ValueError, match=re.escape("predicate = 'dwithin' requires GEOS >= 3.10.0")
         ):
             self.df.sindex.query(Point(0, 0), predicate="dwithin", distance=0)
 
@@ -535,7 +559,15 @@ class TestShapelyInterface:
                 )
             raise e
 
+    def test_unsupported_output(self):
+        with pytest.raises(ValueError, match="Invalid output_format: 'dataarray'"):
+            test_geom = box(-1, -1, -0.5, -0.5)
+            self.df.sindex.query(test_geom, output_format="dataarray")
+
     # ------------------------- `query_bulk` tests -------------------------- #
+    @pytest.mark.parametrize(
+        "output_format", ("indices", pytest.param("sparse", marks=SCIPY_MARK), "dense")
+    )
     @pytest.mark.parametrize(
         "predicate, test_geom, expected",
         (
@@ -635,14 +667,25 @@ class TestShapelyInterface:
             ),  # contains but does not contains_properly
         ),
     )
-    def test_query_bulk(self, predicate, test_geom, expected):
+    def test_query_bulk(self, predicate, test_geom, expected, output_format):
         """Tests the `query` method with valid
         inputs and valid predicates.
         """
-        res = self.df.sindex.query(
-            [box(*geom) for geom in test_geom], predicate=predicate
-        )
+        test_geoms = [box(*geom) for geom in test_geom]
+        res = self.df.sindex.query(test_geoms, predicate=predicate)
         assert_array_equal(res, expected)
+
+        if output_format != "indices":
+            dense = np.zeros((len(self.df), len(test_geoms)), dtype=bool)
+            tree, other = expected[::-1]
+            dense[tree, other] = True
+
+            res = self.df.sindex.query(
+                test_geoms, predicate=predicate, output_format=output_format
+            )
+            if output_format == "sparse":
+                res = res.todense()
+            assert_array_equal(res, dense)
 
     @pytest.mark.parametrize(
         "test_geoms, expected_value",

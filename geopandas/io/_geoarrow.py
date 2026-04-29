@@ -1,5 +1,4 @@
 import json
-from packaging.version import Version
 
 import numpy as np
 import pandas as pd
@@ -10,7 +9,6 @@ import shapely
 from shapely import GeometryType
 
 from geopandas import GeoDataFrame
-from geopandas._compat import SHAPELY_GE_204
 from geopandas.array import from_shapely, from_wkb
 
 GEOARROW_ENCODINGS = [
@@ -111,7 +109,7 @@ def geopandas_to_arrow(
         struct type.
     include_z : bool, default None
         Only relevant for 'geoarrow' encoding (for WKB, the dimensionality
-        of the individial geometries is preserved).
+        of the individual geometries is preserved).
         If False, return 2D geometries. If True, include the third dimension
         in the output (if a geometry has no third dimension, the z-coordinates
         will be NaN). By default, will infer the dimensionality from the
@@ -186,7 +184,7 @@ def construct_wkb_array(
     extension_metadata = {"ARROW:extension:name": "geoarrow.wkb"}
     if crs is not None:
         extension_metadata["ARROW:extension:metadata"] = json.dumps(
-            {"crs": crs.to_json()}
+            {"crs": crs.to_json_dict()}
         )
     else:
         # In theory this should not be needed, but otherwise pyarrow < 17
@@ -287,24 +285,7 @@ def construct_geometry_array(
     )
 
     if mask.any():
-        if (
-            geom_type == GeometryType.POINT
-            and interleaved
-            and Version(pa.__version__) < Version("15.0.0")
-        ):
-            raise ValueError(
-                "Converting point geometries with missing values is not supported "
-                "for interleaved coordinates with pyarrow < 15.0.0. Please "
-                "upgrade to a newer version of pyarrow."
-            )
         mask = pa.array(mask, type=pa.bool_())
-
-        if geom_type == GeometryType.POINT and not SHAPELY_GE_204:
-            # bug in shapely < 2.0.4, see https://github.com/shapely/shapely/pull/2034
-            # this workaround only works if there are no empty points
-            indices = np.nonzero(mask)[0]
-            indices = indices - np.arange(len(indices))
-            coords = np.insert(coords, indices, np.nan, axis=0)
 
     else:
         mask = None
@@ -319,7 +300,7 @@ def construct_geometry_array(
     extension_metadata: dict[str, str] = {}
     if crs is not None:
         extension_metadata["ARROW:extension:metadata"] = json.dumps(
-            {"crs": crs.to_json()}
+            {"crs": crs.to_json_dict()}
         )
     else:
         # In theory this should not be needed, but otherwise pyarrow < 17
@@ -449,7 +430,7 @@ def _get_arrow_geometry_field(field):
     return None
 
 
-def arrow_to_geopandas(table, geometry=None):
+def arrow_to_geopandas(table, geometry=None, to_pandas_kwargs=None):
     """
     Convert Arrow table object to a GeoDataFrame based on GeoArrow extension types.
 
@@ -460,6 +441,12 @@ def arrow_to_geopandas(table, geometry=None):
     geometry : str, default None
         The name of the geometry column to set as the active geometry
         column. If None, the first geometry column found will be used.
+    to_pandas_kwargs : dict, optional
+        Arguments passed to the `pa.Table.to_pandas` method for non-geometry columns.
+        This can be used to control the behavior of the conversion of the non-geometry
+        columns to a pandas DataFrame. For example, you can use this to control the
+        dtype conversion of the columns. By default, the `to_pandas` method is called
+        with no additional arguments.
 
     Returns
     -------
@@ -480,7 +467,9 @@ def arrow_to_geopandas(table, geometry=None):
         raise ValueError("No geometry column found in the Arrow table.")
 
     table_attr = table.drop([f[1] for f in geom_fields])
-    df = table_attr.to_pandas()
+    if to_pandas_kwargs is None:
+        to_pandas_kwargs = {}
+    df = table_attr.to_pandas(**to_pandas_kwargs)
 
     for i, col, ext_name, ext_meta in geom_fields:
         crs = None
@@ -508,9 +497,6 @@ def arrow_to_geometry_array(arr):
 
     Specifically for GeoSeries.from_arrow.
     """
-    if Version(pa.__version__) < Version("14.0.0"):
-        raise ValueError("Importing from Arrow requires pyarrow >= 14.0.")
-
     schema_capsule, array_capsule = arr.__arrow_c_array__()
     field = pa.Field._import_from_c_capsule(schema_capsule)
     pa_arr = pa.Array._import_from_c_capsule(field.__arrow_c_schema__(), array_capsule)

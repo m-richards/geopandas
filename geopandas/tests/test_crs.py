@@ -86,7 +86,7 @@ def test_to_crs_dimension_z():
     assert result.has_z.all()
 
 
-# pyproj + numpy 1.25 trigger warning for single-element array -> recommdation is to
+# pyproj + numpy 1.25 trigger warning for single-element array -> recommendation is to
 # ignore the warning for now (https://github.com/pyproj4/pyproj/issues/1307)
 @pytest.mark.filterwarnings("ignore:Conversion of an array with:DeprecationWarning")
 def test_to_crs_dimension_mixed():
@@ -125,15 +125,29 @@ def epsg4326(request):
 
 @pytest.fixture(
     params=[
-        26918,
-        "epsg:26918",
+        pytest.param(26918, id="epsg_number"),
+        pytest.param("epsg:26918", id="epsg_string"),
         pytest.param(
             {"init": "epsg:26918", "no_defs": True},
+            id="epsg_dict",
         ),
-        "+proj=utm +zone=18 +ellps=GRS80 +datum=NAD83 +units=m +no_defs ",
-        {"proj": "utm", "zone": 18, "datum": "NAD83", "units": "m", "no_defs": True},
-    ],
-    ids=["epsg_number", "epsg_string", "epsg_dict", "proj4_string", "proj4_dict"],
+        pytest.param(
+            "+proj=utm +zone=18 +ellps=GRS80 +datum=NAD83 +units=m "
+            "+no_defs +nadgrids=null",
+            id="proj4_string",
+        ),
+        pytest.param(
+            {
+                "proj": "utm",
+                "zone": 18,
+                "datum": "NAD83",
+                "units": "m",
+                "no_defs": True,
+                "nadgrids": "null",
+            },
+            id="proj4_dict",
+        ),
+    ]
 )
 def epsg26918(request):
     if isinstance(request.param, int):
@@ -144,11 +158,6 @@ def epsg26918(request):
 @pytest.mark.filterwarnings("ignore:'\\+init:DeprecationWarning")
 @pytest.mark.filterwarnings("ignore:'\\+init:FutureWarning")
 def test_transform2(epsg4326, epsg26918):
-    # with PROJ >= 7, the transformation using EPSG code vs proj4 string is
-    # slightly different due to use of grid files or not -> turn off network
-    # to not use grid files at all for this test
-    pyproj.network.set_network_enabled(False)
-
     df = df_epsg26918()
     lonlat = df.to_crs(**epsg4326)
     utm = lonlat.to_crs(**epsg26918)
@@ -157,7 +166,7 @@ def test_transform2(epsg4326, epsg26918):
     assert_geodataframe_equal(df, utm, check_less_precise=True, check_crs=False)
 
 
-# pyproj + numpy 1.25 trigger warning for single-element array -> recommdation is to
+# pyproj + numpy 1.25 trigger warning for single-element array -> recommendation is to
 # ignore the warning for now (https://github.com/pyproj4/pyproj/issues/1307)
 @pytest.mark.filterwarnings("ignore:Conversion of an array with:DeprecationWarning")
 def test_crs_axis_order__always_xy():
@@ -708,7 +717,7 @@ class TestSetCRS:
         naive = constructor([Point(0, 0), Point(1, 1)], crs=None)
         assert naive.crs is None
 
-        # by default returns a copy
+        # by default returns a (shallow) copy
         result = naive.set_crs(crs="EPSG:4326")
         assert result.crs == "EPSG:4326"
         assert naive.crs is None

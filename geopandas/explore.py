@@ -64,7 +64,7 @@ def _explore(
     map_kwds={},
     **kwargs,
 ):
-    """Interactive map based on GeoPandas and folium/leaflet.js
+    """Explore data in interactive map based on GeoPandas and folium/leaflet.js.
 
     Generate an interactive leaflet map based on :class:`~geopandas.GeoDataFrame`
 
@@ -276,7 +276,10 @@ def _explore(
     """
 
     def _colormap_helper(_cmap, n_resample=None, idx=None):
-        """Helper for MPL deprecation - GH#2596"""
+        """Return the color map specified.
+
+        Helper function for MPL deprecation - GH#2596.
+        """
         if not n_resample:
             return cm.get_cmap(_cmap)
         else:
@@ -313,9 +316,7 @@ def _explore(
     # convert LinearRing to LineString
     rings_mask = df.geom_type == "LinearRing"
     if rings_mask.any():
-        gdf.geometry[rings_mask] = gdf.geometry[rings_mask].apply(
-            lambda g: LineString(g)
-        )
+        gdf.geometry[rings_mask] = gdf.geometry[rings_mask].apply(LineString)
     if isinstance(gdf, geopandas.GeoSeries):
         gdf = gdf.to_frame()
 
@@ -758,7 +759,7 @@ def _explore(
 
 
 def _tooltip_popup(type, fields, gdf, **kwds):
-    """get tooltip or popup"""
+    """Get tooltip or popup."""
     import folium
 
     # specify fields to show in the tooltip
@@ -785,8 +786,7 @@ def _tooltip_popup(type, fields, gdf, **kwds):
 
 
 def _categorical_legend(m, title, categories, colors):
-    """
-    Add categorical legend to a map
+    """Add categorical legend to a map.
 
     The implementation is using the code originally written by Michel Metran
     (@michelmetran) and released on GitHub
@@ -805,7 +805,6 @@ def _categorical_legend(m, title, categories, colors):
     colors : list-like
         list of colors (in the same order as categories)
     """
-
     # Header to Add
     head = """
     {% macro header(this, kwargs) %}
@@ -917,7 +916,7 @@ def _explore_geoseries(
     map_kwds={},
     **kwargs,
 ):
-    """Interactive map based on GeoPandas and folium/leaflet.js
+    """Interactive map based on GeoPandas and folium/leaflet.js.
 
     Generate an interactive leaflet map based on :class:`~geopandas.GeoSeries`
 

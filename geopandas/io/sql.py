@@ -23,6 +23,7 @@ def _get_conn(conn_or_engine):
     ----------
     conn_or_engine : Connection or Engine
         A sqlalchemy Connection or Engine instance
+
     Returns
     -------
     Connection
@@ -43,10 +44,11 @@ def _get_conn(conn_or_engine):
 
 
 def _df_to_geodf(df, geom_col="geom", crs=None, con=None):
-    """
-    Transforms a pandas DataFrame into a GeoDataFrame.
+    """Transform a pandas DataFrame into a GeoDataFrame.
+
     The column 'geom_col' must be a geometry column in WKB representation.
     To be used to convert df based on pd.read_sql to gdf.
+
     Parameters
     ----------
     df : DataFrame
@@ -61,11 +63,11 @@ def _df_to_geodf(df, geom_col="geom", crs=None, con=None):
         first geometry in the database, and assigns that to all geometries.
     con : sqlalchemy.engine.Connection or sqlalchemy.engine.Engine
         Active connection to the database to query.
+
     Returns
     -------
     GeoDataFrame
     """
-
     if geom_col not in df:
         raise ValueError(f"Query missing geometry column '{geom_col}'")
 
@@ -132,8 +134,7 @@ def _read_postgis(
     params=None,
     chunksize=None,
 ):
-    """
-    Returns a GeoDataFrame corresponding to the result of the query
+    """Return a GeoDataFrame corresponding to the result of the query
     string, which must contain a geometry column in WKB representation.
 
     It is also possible to use :meth:`~GeoDataFrame.read_file` to read from a database.
@@ -179,7 +180,6 @@ def _read_postgis(
     >>> sql = "SELECT ST_AsBinary(geom) AS geom, highway FROM roads"
     >>> df = geopandas.read_postgis(sql, con)  # doctest: +SKIP
     """
-
     if chunksize is None:
         # read all in one chunk and return a single GeoDataFrame
         df = pd.read_sql(
@@ -210,8 +210,9 @@ def _read_postgis(
 
 
 def _get_geometry_type(gdf):
-    """
-    Get basic geometry type of a GeoDataFrame. See more info from:
+    """Get basic geometry type of a GeoDataFrame.
+
+    See more info from:
     https://geoalchemy-2.readthedocs.io/en/latest/types.html#geoalchemy2.types._GISType
 
     Following rules apply:
@@ -232,7 +233,7 @@ def _get_geometry_type(gdf):
     has_curve = False
 
     for gt in geom_types:
-        if gt is None:
+        if pd.isna(gt):
             continue
         elif "LinearRing" in gt:
             has_curve = True
@@ -241,7 +242,7 @@ def _get_geometry_type(gdf):
         if has_curve:
             target_geom_type = "LINESTRING"
         else:
-            if geom_types[0] is None:
+            if pd.isna(geom_types[0]):
                 raise ValueError("No valid geometries in the data.")
             else:
                 target_geom_type = geom_types[0].upper()
@@ -256,16 +257,12 @@ def _get_geometry_type(gdf):
 
 
 def _get_srid_from_crs(gdf):
-    """
-    Get EPSG code from CRS if available. If not, return 0.
-    """
-
+    """Get EPSG code from CRS if available. If not, return 0."""
     # Use geoalchemy2 default for srid
     # Note: undefined srid in PostGIS is 0
     srid = None
     warning_msg = (
-        "Could not parse CRS from the GeoDataFrame. "
-        "Inserting data without defined CRS."
+        "Could not parse CRS from the GeoDataFrame. Inserting data without defined CRS."
     )
     if gdf.crs is not None:
         try:
@@ -296,9 +293,7 @@ def _convert_linearring_to_linestring(gdf, geom_name):
     # https://github.com/shapely/shapely/issues/1617
 
     mask = gdf.geom_type == "LinearRing"
-    gdf.loc[mask, geom_name] = gdf.loc[mask, geom_name].apply(
-        lambda geom: LineString(geom)
-    )
+    gdf.loc[mask, geom_name] = gdf.loc[mask, geom_name].apply(LineString)
     return gdf
 
 
@@ -390,7 +385,6 @@ def _write_postgis(
 
     Examples
     --------
-
     >>> from sqlalchemy import create_engine  # doctest: +SKIP
     >>> engine = create_engine("postgresql://myusername:mypassword@myhost:5432\
 /mydatabase";)  # doctest: +SKIP
@@ -435,7 +429,11 @@ def _write_postgis(
             # Only check SRID if table exists
             if connection.dialect.has_table(connection, name, schema):
                 target_srid = connection.execute(
-                    text(f"SELECT Find_SRID('{schema_name}', '{name}', '{geom_name}');")
+                    text(
+                        "SELECT Find_SRID(:schema_name, :name, :geom_name);"
+                    ).bindparams(
+                        schema_name=schema_name, name=name, geom_name=geom_name
+                    )
                 ).fetchone()[0]
 
                 if target_srid != srid:

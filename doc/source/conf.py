@@ -75,7 +75,7 @@ autodoc_typehints = "none"
 
 
 def setup(app):
-    app.add_css_file("custom.css")  # may also be an URL
+    app.add_css_file("custom.css")  # may also be a URL
 
 
 # Add any paths that contain templates here, relative to this directory.
@@ -171,11 +171,6 @@ html_theme_options = {
             "name": "GitHub",
             "url": "https://github.com/geopandas/geopandas",
             "icon": "fab fa-github-square fa-xl",
-        },
-        {
-            "name": "Twitter",
-            "url": "https://twitter.com/geopandas",
-            "icon": "fab fa-twitter-square fa-xl",
         },
     ]
 }
@@ -378,8 +373,8 @@ nbsphinx_prolog = r"""
 # connect docs in other projects
 intersphinx_mapping = {
     "cartopy": (
-        "https://scitools.org.uk/cartopy/docs/latest/",
-        "https://scitools.org.uk/cartopy/docs/latest/objects.inv",
+        "https://cartopy.readthedocs.io/stable/",
+        "https://cartopy.readthedocs.io/stable/objects.inv",
     ),
     "contextily": (
         "https://contextily.readthedocs.io/en/stable/",

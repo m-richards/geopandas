@@ -1,3 +1,4 @@
+import re
 import string
 import warnings
 
@@ -20,7 +21,7 @@ from shapely.geometry.collection import GeometryCollection
 from shapely.ops import unary_union
 
 from geopandas import GeoDataFrame, GeoSeries
-from geopandas._compat import HAS_PYPROJ
+from geopandas._compat import GEOS_GE_312, HAS_PYPROJ
 from geopandas.base import GeoPandasBase
 
 import pytest
@@ -347,6 +348,24 @@ class TestGeomMethods:
         assert len(self.g0.intersection(self.g9, align=True) == 8)
         assert len(self.g0.intersection(self.g9, align=False) == 7)
 
+    @pytest.mark.parametrize(
+        "grid_size, expected",
+        [
+            (
+                None,
+                Polygon([(2.2, 2.2), (2.2, 0.8), (0.8, 0.8), (0.8, 2.2), (2.2, 2.2)]),
+            ),
+            (1, Polygon([(2.0, 2.0), (2.0, 1.0), (1.0, 1.0), (1.0, 2.0), (2.0, 2.0)])),
+        ],
+    )
+    def test_intersection_grid_size(self, grid_size, expected):
+        poly1 = GeoSeries([Polygon([(0, 0), (2.2, 0), (2.2, 2.2), (0, 2.2)])])
+        poly2 = GeoSeries([Polygon([(0.8, 0.8), (3.2, 0.8), (3.2, 3.2), (0.8, 3.2)])])
+
+        self._test_binary_topological(
+            "intersection", expected, poly1, poly2, grid_size=grid_size
+        )
+
     def test_clip_by_rect(self):
         self._test_binary_topological(
             "clip_by_rect", self.g1, self.g10, *self.sq.bounds
@@ -365,6 +384,26 @@ class TestGeomMethods:
     def test_union_polygon(self):
         self._test_binary_topological("union", self.sq, self.g1, self.t2)
 
+    def test_union_polygon_grid_size(self):
+        poly1 = GeoSeries([Polygon([(0, 0), (0, 1.0), (1.8, 1.0), (1.8, 0)])])
+        poly2 = GeoSeries([Polygon([(2.2, 0), (2.2, 1.0), (3.0, 1.0), (3.0, 0)])])
+
+        expected_no_grid_size = MultiPolygon(
+            [
+                Polygon([(0, 0), (0, 1.0), (1.8, 1.0), (1.8, 0)]),
+                Polygon([(2.2, 0), (2.2, 1.0), (3.0, 1.0), (3.0, 0)]),
+            ]
+        )
+
+        expected_grid_size_one = Polygon([(0, 0), (0, 1), (3, 1), (3, 0)])
+
+        self._test_binary_topological("union", expected_no_grid_size, poly1, poly2)
+        # Check no difference in polygon coverage
+        assert (
+            poly1.union(poly2, grid_size=1).difference(expected_grid_size_one)[0]
+            == self.empty_poly
+        )
+
     def test_symmetric_difference_series(self):
         self._test_binary_topological("symmetric_difference", self.sq, self.g3, self.g4)
 
@@ -377,6 +416,37 @@ class TestGeomMethods:
             "symmetric_difference", expected, self.g3, self.t1
         )
 
+    @pytest.mark.parametrize(
+        "grid_size, expected",
+        [
+            (
+                None,
+                MultiPolygon(
+                    [
+                        Polygon([(0, 1), (1.2, 1), (1.2, 0), (0, 0), (0, 1)]),
+                        Polygon([(1.8, 1), (3, 1), (3, 0), (1.8, 0), (1.8, 1)]),
+                    ]
+                ),
+            ),
+            (
+                1,
+                MultiPolygon(
+                    [
+                        Polygon([(0, 1), (1, 1), (1, 0), (0, 0), (0, 1)]),
+                        Polygon([(2, 1), (3, 1), (3, 0), (2, 0), (2, 1)]),
+                    ]
+                ),
+            ),
+        ],
+    )
+    def test_symmetric_difference_poly_grid_size(self, grid_size, expected):
+        poly1 = GeoSeries(Polygon([(0, 0), (0, 1), (1.8, 1.0), (1.8, 0), (0, 0)]))
+        poly2 = GeoSeries(Polygon([(1.2, 0), (1.2, 1), (3.0, 1.0), (3.0, 0), (1.2, 0)]))
+
+        self._test_binary_topological(
+            "symmetric_difference", expected, poly1, poly2, grid_size=grid_size
+        )
+
     def test_difference_series(self):
         expected = GeoSeries([GeometryCollection(), self.t2])
         self._test_binary_topological("difference", expected, self.g1, self.g2)
@@ -387,6 +457,36 @@ class TestGeomMethods:
     def test_difference_poly(self):
         expected = GeoSeries([self.t1, self.t1])
         self._test_binary_topological("difference", expected, self.g1, self.t2)
+
+    @pytest.mark.parametrize(
+        "grid_size, expected",
+        [
+            (
+                None,
+                GeoSeries(
+                    [
+                        Polygon([(1, 1), (1, 0), (0, 0), (1, 1)]),
+                        Polygon([(1, 1), (1, 0), (0, 0), (0.8, 1.0), (1.0, 1.0)]),
+                    ]
+                ),
+            ),
+            (
+                1,
+                GeoSeries(
+                    [
+                        Polygon([(0, 0), (1, 0), (1, 1)]),
+                        Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]),
+                    ]
+                ),
+            ),
+        ],
+    )
+    def test_difference_poly_grid_size(self, grid_size, expected):
+        poly = Polygon([(0, 0), (0.8, 1.0), (0.0, 1.0), (0, 0)])
+
+        self._test_binary_topological(
+            "difference", expected, self.g1, poly, grid_size=grid_size
+        )
 
     def test_shortest_line(self):
         expected = GeoSeries([LineString([(1, 1), (5, 5)]), None])
@@ -500,6 +600,8 @@ class TestGeomMethods:
         assert g3.union_all().equals(shapely.GeometryCollection())
 
         assert g.union_all(method="coverage").equals(expected)
+        if GEOS_GE_312:
+            assert g.union_all(method="disjoint_subset").equals(expected)
 
     def test_unary_union_deprecated(self):
         p1 = self.t1
@@ -648,10 +750,10 @@ class TestGeomMethods:
             ],
             index=self.g0.index,
         )
-        assert_array_dtype_equal(expected, self.g0.relate(self.inner_sq))
+        assert_series_equal(expected, self.g0.relate(self.inner_sq))
 
         expected = Series(["FF0FFF212", None], index=self.g6.index)
-        assert_array_dtype_equal(expected, self.g6.relate(self.na_none))
+        assert_series_equal(expected, self.g6.relate(self.na_none))
 
         expected = Series(
             [
@@ -667,7 +769,7 @@ class TestGeomMethods:
             index=range(8),
         )
 
-        assert_array_dtype_equal(expected, self.g0.relate(self.g9, align=True))
+        assert_series_equal(expected, self.g0.relate(self.g9, align=True))
 
         expected = Series(
             [
@@ -681,7 +783,7 @@ class TestGeomMethods:
             ],
             index=self.g0.index,
         )
-        assert_array_dtype_equal(expected, self.g0.relate(self.g9, align=False))
+        assert_series_equal(expected, self.g0.relate(self.g9, align=False))
 
     def test_relate_pattern(self):
         expected = Series([True] * 4 + [False] * 3, index=self.g0.index, dtype=bool)
@@ -896,6 +998,37 @@ class TestGeomMethods:
         expected = Series(["Self-intersection[0.5 0.5]", "Valid Geometry", None])
         assert_series_equal(s.is_valid_reason(), expected)
 
+    @pytest.mark.skipif(not GEOS_GE_312, reason="GEOS 3.12 and shapely 2.1 needed.")
+    def test_is_valid_coverage(self):
+        s = GeoSeries(
+            [
+                Polygon([(0, 0), (1, 1), (1, 0), (0, 0)]),
+                Polygon([(0, 0), (1, 1), (0, 1), (0, 0)]),
+            ]
+        )
+        assert s.is_valid_coverage()
+
+        s2 = GeoSeries(
+            [
+                Polygon([(0, 0), (1, 1), (1, 0), (0, 0)]),
+                Polygon([(0, 0), (0.5, 0.5), (1, 1), (0, 1), (0, 0)]),
+            ]
+        )
+        assert not s2.is_valid_coverage()
+
+    @pytest.mark.skipif(not GEOS_GE_312, reason="GEOS 3.12 and shapely 2.1 needed.")
+    def test_invalid_coverage_edges(self):
+        s = GeoSeries(
+            [
+                Polygon([(0, 0), (1, 1), (1, 0), (0, 0)]),
+                Polygon([(0, 0), (0.5, 0.5), (1, 1), (0, 1), (0, 0)]),
+            ]
+        )
+        expected = GeoSeries(
+            [LineString([(0, 0), (1, 1)]), LineString([(0, 0), (0.5, 0.5), (1, 1)])]
+        )
+        assert_geoseries_equal(s.invalid_coverage_edges(), expected)
+
     def test_is_empty(self):
         expected = Series(np.array([False] * len(self.g1)), self.g1.index)
         self._test_unary_real("is_empty", expected, self.g1)
@@ -922,6 +1055,17 @@ class TestGeomMethods:
         expected = Series([False, True], self.g_3d.index)
         self._test_unary_real("has_z", expected, self.g_3d)
 
+    @pytest.mark.skipif(shapely.geos_version < (3, 12, 0), reason="requires GEOS>=3.12")
+    def test_has_m(self):
+        s = GeoSeries.from_wkt(
+            [
+                "POINT M (2 3 5)",
+                "POINT Z (1 2 3)",
+            ],
+        )
+        expected = Series([True, False])
+        self._test_unary_real("has_m", expected, s)
+
     def test_xyz_points(self):
         expected_x = [-73.9847, -74.0446]
         expected_y = [40.7484, 40.6893]
@@ -934,6 +1078,18 @@ class TestGeomMethods:
         # mixed dimensions
         expected_z = [30.3244, 31.2344, np.nan]
         assert_array_dtype_equal(expected_z, self.landmarks_mixed.geometry.z)
+
+    def test_m_points(self):
+        s = GeoSeries.from_wkt(
+            [
+                "POINT M (2 3 5)",
+                "POINT M (1 2 3)",
+                "POINT (0 0)",
+            ]
+        )
+
+        expected = [5, 3, np.nan]
+        assert_array_dtype_equal(expected, s.m)
 
     def test_xyz_points_empty(self):
         expected_x = [-73.9847, -74.0446, -73.9847, np.nan]
@@ -976,6 +1132,29 @@ class TestGeomMethods:
         expected = GeoSeries([polygon2, linestring, point])
         assert_geoseries_equal(series.normalize(), expected)
 
+    def test_orient_polygons(self):
+        polygon = Polygon(
+            [(0, 0), (0, 10), (10, 10), (10, 0), (0, 0)],
+            holes=[[(2, 2), (2, 4), (4, 4), (4, 2), (2, 2)]],
+        )
+        linestring = LineString([(0, 0), (1, 1), (1, 0)])
+        point = Point(0, 0)
+        series = GeoSeries([polygon, linestring, point])
+
+        polygon2 = Polygon(
+            [(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)],
+            holes=[[(2, 2), (2, 4), (4, 4), (4, 2), (2, 2)]],
+        )
+        expected = GeoSeries([polygon2, linestring, point])
+        assert_geoseries_equal(series.orient_polygons(), expected)
+
+        polygon_cw = Polygon(
+            [(0, 0), (0, 10), (10, 10), (10, 0), (0, 0)],
+            holes=[[(2, 2), (2, 4), (4, 4), (4, 2), (2, 2)]],
+        )
+        expected = GeoSeries([polygon_cw, linestring, point])
+        assert_geoseries_equal(series.orient_polygons(exterior_cw=True), expected)
+
     def test_make_valid(self):
         polygon1 = Polygon([(0, 0), (0, 2), (1, 1), (2, 2), (2, 0), (1, 1), (0, 0)])
         polygon2 = Polygon([(0, 2), (0, 1), (2, 0), (0, 0), (0, 2)])
@@ -994,6 +1173,31 @@ class TestGeomMethods:
         assert not series.is_valid.all()
         result = series.make_valid()
         assert_geoseries_equal(result, expected)
+        assert result.is_valid.all()
+
+    @pytest.mark.parametrize(
+        "method, keep_collapsed, expected",
+        [
+            (
+                "linework",
+                True,
+                MultiLineString([[(0, 0), (1, 1)], [(1, 1), (1, 2)]]),
+            ),
+            (
+                "structure",
+                True,
+                LineString([(0, 0), (1, 1), (1, 2), (1, 1), (0, 0)]),
+            ),
+            ("structure", False, Polygon()),
+        ],
+    )
+    def test_make_valid_method(self, method, keep_collapsed, expected):
+        polygon = Polygon([(0, 0), (1, 1), (1, 2), (1, 1), (0, 0)])
+        series = GeoSeries([polygon])
+        expected = GeoSeries([expected])
+        assert not series.is_valid.all()
+        result = series.make_valid(method=method, keep_collapsed=keep_collapsed)
+        assert_geoseries_equal(result, expected, check_geom_type=True)
         assert result.is_valid.all()
 
     def test_reverse(self):
@@ -1124,6 +1328,15 @@ class TestGeomMethods:
             self.g1.concave_hull(
                 ratio=0.1, allow_holes=Series([True, False], index=[99, 98])
             )
+
+    def test_constrained_delaunay_triangles(self):
+        input = GeoSeries([Polygon([(0, 0), (1, 1), (0, 1)])])
+        expected = GeoSeries(
+            [GeometryCollection([Polygon([(0, 0), (0, 1), (1, 1), (0, 0)])])]
+        )
+        assert_geoseries_equal(
+            input.constrained_delaunay_triangles(), expected, check_geom_type=True
+        )
 
     def test_convex_hull(self):
         # the convex hull of a square should be the same as the square
@@ -1329,8 +1542,15 @@ class TestGeomMethods:
     def test_buffer(self):
         original = GeoSeries([Point(0, 0)])
         expected = GeoSeries([Polygon(((5, 0), (0, -5), (-5, 0), (0, 5), (5, 0)))])
-        calculated = original.buffer(5, resolution=1)
+        calculated = original.buffer(5, quad_segs=1)
         assert geom_almost_equals(expected, calculated)
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="The `resolution` argument to `buffer` is deprecated",
+        ):
+            calculated = original.buffer(5, resolution=1)
+            assert geom_almost_equals(expected, calculated)
 
     def test_buffer_args(self):
         args = {"cap_style": 3, "join_style": 2, "mitre_limit": 2.5}
@@ -1350,7 +1570,7 @@ class TestGeomMethods:
                 Polygon(((10, 5), (5, 0), (0, 5), (5, 10), (10, 5))),
             ]
         )
-        calculated = original.buffer(np.array([1, 5]), resolution=1)
+        calculated = original.buffer(np.array([1, 5]), quad_segs=1)
         assert_geoseries_equal(calculated, expected, check_less_precise=True)
 
     def test_buffer_distance_wrong_length(self):
@@ -1367,7 +1587,7 @@ class TestGeomMethods:
                 Polygon(((10, 5), (5, 0), (0, 5), (5, 10), (10, 5))),
             ]
         )
-        calculated = original.buffer(Series([1, 5]), resolution=1)
+        calculated = original.buffer(Series([1, 5]), quad_segs=1)
         assert_geoseries_equal(calculated, expected, check_less_precise=True)
 
     def test_buffer_distance_wrong_index(self):
@@ -1410,6 +1630,36 @@ class TestGeomMethods:
         ):
             self.g1.simplify(Series([0.1], index=[99]))
 
+    @pytest.mark.skipif(not GEOS_GE_312, reason="GEOS 3.12 and shapely 2.1 needed.")
+    def test_simplify_coverage(self):
+        s = GeoSeries(
+            [
+                shapely.Polygon(
+                    [(0, 0), (10, 1), (20, 0), (20, 10), (10, 5), (0, 10), (0, 0)]
+                ),
+                shapely.Polygon(
+                    [(0, 10), (10, 5), (20, 10), (20, 20), (0, 20), (0, 10)]
+                ),
+            ]
+        )
+        e = GeoSeries(
+            [
+                shapely.Polygon([(0, 0), (20, 0), (20, 10), (0, 10)]),
+                shapely.Polygon([(0, 10), (20, 10), (20, 20), (0, 20)]),
+            ]
+        )
+        assert_geoseries_equal(s.simplify_coverage(8), e.normalize())
+
+        e_boundary = GeoSeries(
+            [
+                shapely.Polygon([(0, 0), (10, 1), (20, 0), (20, 10), (0, 10)]),
+                shapely.Polygon([(0, 10), (20, 10), (20, 20), (0, 20)]),
+            ]
+        )
+        assert_geoseries_equal(
+            s.simplify_coverage(8, simplify_boundary=False), e_boundary.normalize()
+        )
+
     def test_envelope(self):
         e = self.g3.envelope
         assert np.all(e.geom_equals(self.sq))
@@ -1446,6 +1696,28 @@ class TestGeomMethods:
         )
         assert isinstance(mbc, GeoSeries)
         assert self.g1.crs == mbc.crs
+
+    def test_maximum_inscribed_circle(self):
+        gs = GeoSeries(
+            [
+                Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]),
+                Polygon([(0, 0), (0.5, -1), (1, 0), (1, 1), (-0.5, 0.5)]),
+            ]
+        )
+        mic = gs.maximum_inscribed_circle()
+        assert (mic.geom_type == "LineString").all()
+        assert (shapely.get_num_points(mic) == 2).all()
+        expected_centers = GeoSeries([Point(0.5, 0.5), Point(0.466796875, 0.259765625)])
+        expected_length = Series([0.5, 0.533203125])
+        assert_geoseries_equal(
+            shapely.get_point(mic, 0), expected_centers, check_less_precise=True
+        )
+        assert_series_equal(shapely.length(mic), expected_length)
+
+        # with tolerance for second polygon -> stops earlier with smaller circle, thus
+        # just assert the length of the resulting line is lower
+        mic_tolerance = gs.maximum_inscribed_circle(tolerance=np.array([0, 10]))
+        assert (shapely.length(mic_tolerance) <= 0.5).all()
 
     def test_total_bounds(self):
         bbox = self.sol.x, self.sol.y, self.esb.x, self.esb.y
@@ -1488,7 +1760,7 @@ class TestGeomMethods:
             names=[index_name, None],
         )
         expected_df = expected_df.set_index(expected_index)
-        assert_frame_equal(test_df, expected_df)
+        assert_frame_equal(test_df, expected_df, check_index_type=False)
 
     @pytest.mark.parametrize("index_name", [None, "test"])
     def test_explode_geodataframe_level_1(self, index_name):
@@ -1507,7 +1779,7 @@ class TestGeomMethods:
             names=[index_name, None],
         )
         expected_df = expected_df.set_index(expected_index)
-        assert_frame_equal(test_df, expected_df)
+        assert_frame_equal(test_df, expected_df, check_index_type=False)
 
     @pytest.mark.parametrize("index_name", [None, "test"])
     def test_explode_geodataframe_no_multiindex(self, index_name):
@@ -1613,7 +1885,7 @@ class TestGeomMethods:
             names=["first", "second", None],
         )
         expected_df = expected_df.set_index(expected_index)
-        assert_frame_equal(test_df, expected_df)
+        assert_frame_equal(test_df, expected_df, check_index_type=False)
 
     @pytest.mark.parametrize("outer_index", [1, (1, 2), "1"])
     def test_explode_pandas_multi_index_false(self, outer_index):
@@ -1714,7 +1986,7 @@ class TestGeomMethods:
             geometry=expected_geometry,
             index=expected_index,
         )
-        assert_geodataframe_equal(test_df, expected_df)
+        assert_geodataframe_equal(test_df, expected_df, check_index_type=False)
 
     def test_explode_order_no_multi(self):
         df = GeoDataFrame(
@@ -1732,7 +2004,7 @@ class TestGeomMethods:
             geometry=[Point(0, x) for x in range(3)],
             index=expected_index,
         )
-        assert_geodataframe_equal(test_df, expected_df)
+        assert_geodataframe_equal(test_df, expected_df, check_index_type=False)
 
     def test_explode_order_mixed(self):
         df = GeoDataFrame(
@@ -1760,7 +2032,7 @@ class TestGeomMethods:
             geometry=expected_geometry,
             index=expected_index,
         )
-        assert_geodataframe_equal(test_df, expected_df)
+        assert_geodataframe_equal(test_df, expected_df, check_index_type=False)
 
     def test_explode_duplicated_index(self):
         df = GeoDataFrame(
@@ -1788,7 +2060,7 @@ class TestGeomMethods:
             geometry=expected_geometry,
             index=expected_index,
         )
-        assert_geodataframe_equal(test_df, expected_df)
+        assert_geodataframe_equal(test_df, expected_df, check_index_type=False)
 
     @pytest.mark.parametrize("geom_col", ["geom", "geometry"])
     def test_explode_geometry_name(self, geom_col):
@@ -1824,6 +2096,35 @@ class TestGeomMethods:
         )
         assert_frame_equal(self.g11.get_coordinates(include_z=True), expected)
 
+    def test_get_coordinates_m(self):
+        s = GeoSeries.from_wkt(
+            [
+                "POINT M (2 3 5)",
+                "POINT ZM (1 2 3 4)",
+            ],
+        )
+
+        # only m
+        expected = DataFrame(
+            data=np.array([[2.0, 3.0, 5.0], [1.0, 2.0, 4.0]]),
+            columns=["x", "y", "m"],
+        )
+        assert_frame_equal(s.get_coordinates(include_m=True), expected)
+
+        # only z
+        expected = DataFrame(
+            data=np.array([[2.0, 3.0, np.nan], [1.0, 2.0, 3.0]]),
+            columns=["x", "y", "z"],
+        )
+        assert_frame_equal(s.get_coordinates(include_z=True), expected)
+
+        # both
+        expected = DataFrame(
+            data=np.array([[2.0, 3.0, np.nan, 5.0], [1.0, 2.0, 3.0, 4.0]]),
+            columns=["x", "y", "z", "m"],
+        )
+        assert_frame_equal(s.get_coordinates(include_z=True, include_m=True), expected)
+
     def test_get_coordinates_ignore(self):
         expected = DataFrame(
             data=self.expected_2d,
@@ -1853,7 +2154,11 @@ class TestGeomMethods:
                 ]
             ),
         )
-        assert_frame_equal(self.g11.get_coordinates(index_parts=True), expected)
+        assert_frame_equal(
+            self.g11.get_coordinates(index_parts=True),
+            expected,
+            check_index_type=False,
+        )
 
     def test_minimum_bounding_radius(self):
         mbr_geoms = self.g1.minimum_bounding_radius()
@@ -1885,6 +2190,14 @@ class TestGeomMethods:
             Series([1.0, 1.0]),
         )
 
+    def test_minimum_clearance_line(self):
+        mcl_geoms = self.g1.minimum_clearance_line()
+
+        expected = GeoSeries(
+            [LineString([(1, 0), (0.5, 0.5)]), LineString([(0, 0), (1, 0)])]
+        )
+        assert_geoseries_equal(mcl_geoms, expected)
+
     @pytest.mark.parametrize("size", [10, 20, 50])
     def test_sample_points(self, size):
         for gs in (
@@ -1899,8 +2212,6 @@ class TestGeomMethods:
                 len(output.explode(ignore_index=True))
                 == len(gs[~(gs.is_empty | gs.isna())]) * size
             )
-        with pytest.warns(FutureWarning, match="The 'seed' keyword is deprecated"):
-            _ = gs.sample_points(size, seed=1)
 
     def test_sample_points_array(self):
         output = concat([self.g1, self.g1]).sample_points([10, 15, 20, 25])
@@ -1909,22 +2220,46 @@ class TestGeomMethods:
         )
         assert_series_equal(shapely.get_num_geometries(output), expected)
 
+    @pytest.mark.parametrize("rng", [None, 1, np.random.default_rng(seed=2)])
     @pytest.mark.parametrize("size", [10, 20, 50])
-    def test_sample_points_pointpats(self, size):
+    @pytest.mark.parametrize("method", ["cluster_poisson", "cluster_normal"])
+    def test_sample_points_pointpats(self, method, size, rng):
         pytest.importorskip("pointpats")
         for gs in (
             self.g1,
             self.na,
             self.a1,
         ):
-            output = gs.sample_points(size, method="cluster_poisson")
-            assert_index_equal(gs.index, output.index)
+            output1 = gs.sample_points(size, method=method, rng=rng)
+            assert_index_equal(gs.index, output1.index)
             assert (
-                len(output.explode(ignore_index=True)) == len(gs[~gs.is_empty]) * size
+                len(output1.explode(ignore_index=True)) == len(gs[~gs.is_empty]) * size
             )
 
-        with pytest.raises(AttributeError, match="pointpats.random module has no"):
+            if rng is not None:
+                output2 = gs.sample_points(size, method=method, rng=rng)
+                if rng == 1:
+                    assert_geoseries_equal(output1, output2)
+                else:
+                    with pytest.raises(AssertionError, match="2 out of"):
+                        assert_geoseries_equal(output1, output2)
+
+        with pytest.raises(
+            AttributeError, match=re.escape("pointpats.random module has no")
+        ):
             gs.sample_points(10, method="nonexistent")
+
+    @pytest.mark.parametrize("rng", [None, 1, np.random.default_rng(seed=2)])
+    @pytest.mark.parametrize("method", ["cluster_poisson", "cluster_normal"])
+    def test_sample_points_pointpats_array(self, method, rng):
+        pytest.importorskip("pointpats")
+        output = concat([self.g1, self.g1]).sample_points(
+            [10, 15, 20, 25], method=method, rng=rng
+        )
+        expected = Series(
+            [10, 15, 20, 25], index=[0, 1, 0, 1], name="sampled_points", dtype="int32"
+        )
+        assert_series_equal(shapely.get_num_geometries(output), expected)
 
     def test_offset_curve(self):
         oc = GeoSeries([self.l1]).offset_curve(1, join_style="mitre")
@@ -2146,7 +2481,7 @@ class TestGeomMethods:
         shapely.geos_version < (3, 11, 0), reason="different order in GEOS<3.11"
     )
     def test_build_area(self):
-        # test with polgon in it
+        # test with polygon in it
         s = GeoSeries.from_wkt(
             [
                 "LINESTRING (18 4, 4 2, 2 9)",

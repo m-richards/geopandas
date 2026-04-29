@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shutil
 import tempfile
 from enum import Enum
@@ -151,17 +152,19 @@ class TestDataFrame:
         df = GeoDataFrame(data)
         s = GeoSeries([Point(x, y + 1) for x, y in zip(range(5), range(5))])
 
+        expected = s.copy()
+
         # setting geometry column
         for vals in [s, s.values]:
             df["geometry"] = vals
-            assert_geoseries_equal(df["geometry"], s)
-            assert_geoseries_equal(df.geometry, s)
+            assert_geoseries_equal(df["geometry"], expected)
+            assert_geoseries_equal(df.geometry, expected)
 
         # non-aligned values
         s2 = GeoSeries([Point(x, y + 1) for x, y in zip(range(6), range(6))])
         df["geometry"] = s2
-        assert_geoseries_equal(df["geometry"], s)
-        assert_geoseries_equal(df.geometry, s)
+        assert_geoseries_equal(df["geometry"], expected)
+        assert_geoseries_equal(df.geometry, expected)
 
         # setting other column with geometry values -> preserve geometry type
         for vals in [s, s.values]:
@@ -253,10 +256,12 @@ class TestDataFrame:
     def test_set_geometry(self):
         geom = GeoSeries([Point(x, y) for x, y in zip(range(5), range(5))])
         original_geom = self.df.geometry
+        expected = geom.copy()
+        expected.crs = self.df.crs
 
         df2 = self.df.set_geometry(geom)
-        assert self.df is not df2
-        assert_geoseries_equal(df2.geometry, geom, check_crs=False)
+        assert df2 is not self.df
+        assert_geoseries_equal(df2.geometry, expected)
         assert_geoseries_equal(self.df.geometry, original_geom)
         assert_geoseries_equal(self.df["geometry"], self.df.geometry)
         # unknown column
@@ -289,7 +294,7 @@ class TestDataFrame:
     def test_set_geometry_col(self):
         g = self.df.geometry
         g_simplified = g.simplify(100)
-        self.df["simplified_geometry"] = g_simplified
+        self.df["simplified_geometry"] = g_simplified.copy()
         df2 = self.df.set_geometry("simplified_geometry")
 
         # Drop is false by default
@@ -352,7 +357,7 @@ class TestDataFrame:
         # "geometry" originally present but dropped (but still a gdf)
         col_subset_drop_geometry = ["BoroCode", "BoroName", "geom2"]
         df2 = self.df.copy().assign(geom2=self.df.geometry)[col_subset_drop_geometry]
-        with pytest.raises(AttributeError, match="is not present."):
+        with pytest.raises(AttributeError, match="is not present"):
             df2.geometry
 
         msg_other_geo_cols_present = "There are columns with geometry data type"
@@ -377,13 +382,13 @@ class TestDataFrame:
     @pytest.mark.skipif(not compat.HAS_PYPROJ, reason="Requires pyproj")
     def test_override_existing_crs_warning(self):
         with pytest.warns(
-            DeprecationWarning,
+            FutureWarning,
             match="Overriding the CRS of a GeoSeries that already has CRS",
         ):
             self.df.geometry.crs = "epsg:2100"
 
         with pytest.warns(
-            DeprecationWarning,
+            FutureWarning,
             match="Overriding the CRS of a GeoDataFrame that already has CRS",
         ):
             self.df.crs = "epsg:4326"
@@ -469,6 +474,18 @@ class TestDataFrame:
         # check it converts to WGS84
         coord = data["features"][0]["geometry"]["coordinates"][0][0][0]
         np.testing.assert_allclose(coord, [-74.0505080640324, 40.5664220341941])
+
+    def test_to_json_missing_geom_errors_nicely(self):
+        df = self.df.copy()
+        # mock doing some operation where the tracking of the active geometry
+        # column is lost
+        df._geometry_column_name = None
+        msg = re.escape(
+            "You are calling a geospatial method on the GeoDataFrame, but the "
+            "active geometry column to use has not been set"
+        )
+        with pytest.raises(AttributeError, match=msg):
+            df.to_json()
 
     def test_to_json_wgs84_false(self):
         text = self.df.to_json()
@@ -580,7 +597,7 @@ class TestDataFrame:
             data=[[1, 2, 3]], columns=["a", "b", "a"], geometry=[Point(1, 1)]
         )
         with pytest.raises(
-            ValueError, match="GeoDataFrame cannot contain duplicated column names."
+            ValueError, match="GeoDataFrame cannot contain duplicated column names"
         ):
             df.to_json()
 
@@ -601,6 +618,14 @@ class TestDataFrame:
         df = GeoDataFrame(pd.DataFrame({"a": [1, 2, 3]}))
         assert type(df) is GeoDataFrame
         assert type(df.copy()) is GeoDataFrame
+
+    def test_empty(self):
+        df = GeoDataFrame({"geometry": []})
+        assert df.geometry.dtype == "geometry"
+        df = GeoDataFrame({"a": []}, geometry="a")
+        assert df.geometry.dtype == "geometry"
+        df = GeoDataFrame(geometry=[])
+        assert df.geometry.dtype == "geometry"
 
     def test_bool_index(self):
         # Find boros with 'B' in their name
@@ -669,7 +694,7 @@ class TestDataFrame:
         df = GeoDataFrame.from_features([f1, f2, f3])
 
         result = df[["a", "b"]]
-        expected = pd.DataFrame.from_dict(
+        expected = pd.DataFrame(
             [{"a": 0, "b": np.nan}, {"a": np.nan, "b": 1}, {"a": np.nan, "b": np.nan}]
         )
         assert_frame_equal(expected, result)
@@ -766,6 +791,26 @@ class TestDataFrame:
         gdf2 = GeoDataFrame.from_features(gjson_null)
 
         assert_frame_equal(gdf1, gdf2)
+        assert "properties" not in gdf1.columns
+
+    def test_from_features_no_properties(self):
+        data = {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [0.0, 90.0]},
+                },
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [0.0, -90.0]},
+                },
+            ],
+        }
+
+        gdf = GeoDataFrame.from_features(data)
+        assert gdf.shape == (2, 1)
+        assert "properties" not in gdf.columns
 
     def test_from_features_geom_interface_feature(self):
         class Placemark:
@@ -910,7 +955,7 @@ class TestDataFrame:
         assert isinstance(result["properties"]["Shape_Leng"], float)
 
         with pytest.raises(
-            ValueError, match="GeoDataFrame cannot contain duplicated column names."
+            ValueError, match="GeoDataFrame cannot contain duplicated column names"
         ):
             df_with_duplicate_columns = df[
                 ["Shape_Leng", "Shape_Leng", "Shape_Area", "geometry"]
@@ -1103,7 +1148,9 @@ class TestDataFrame:
         assert (
             sorted(sorted_clipped_cities.index) == sorted_clipped_cities.index
         ).all()
-        assert_index_equal(expected_sorted_index, sorted_clipped_cities.index)
+        assert_index_equal(
+            expected_sorted_index, sorted_clipped_cities.index, exact=True
+        )
 
     def test_overlay(self, dfs, how):
         """
@@ -1240,12 +1287,12 @@ class TestConstructor:
 
             res = GeoDataFrame(df, index=pd.Index([0, 2]))
             check_geodataframe(res)
-            assert_index_equal(res.index, pd.Index([0, 2]))
+            assert_index_equal(res.index, pd.Index([0, 2]), exact="equiv")
             assert res["A"].tolist() == [0, 2]
 
             res = GeoDataFrame(df, columns=["geometry", "B"])
             check_geodataframe(res)
-            assert_index_equal(res.columns, pd.Index(["geometry", "B"]))
+            assert_index_equal(res.columns, pd.Index(["geometry", "B"]), exact=False)
 
             with pytest.raises(ValueError):
                 GeoDataFrame(df, geometry="other_geom")
@@ -1373,7 +1420,7 @@ class TestConstructor:
         df.columns = pd.MultiIndex.from_product([["geometry"], [0, 1]])
         # don't error in constructor
         gdf = GeoDataFrame(df)
-        with pytest.raises(AttributeError, match=".*geometry .* has not been set.*"):
+        with pytest.raises(AttributeError, match=r".*geometry .* has not been set.*"):
             gdf.geometry
         res_gdf = gdf.set_geometry(("geometry", 0))
         assert res_gdf.shape == gdf.shape
@@ -1505,6 +1552,32 @@ class TestConstructor:
         res = GeoDataFrame(df, geometry=Fruit.pear)
         assert res.active_geometry_name == Fruit.pear
 
+    def test_geometry_nan_scalar(self):
+        gdf = GeoDataFrame(
+            data=[[np.nan, np.nan]],
+            columns=["geometry", "something"],
+            crs="EPSG:4326",
+        )
+        assert gdf.shape == (1, 2)
+        assert gdf.active_geometry_name == "geometry"
+        assert gdf.geometry[0] is None
+        if compat.HAS_PYPROJ:
+            assert gdf.crs == "EPSG:4326"
+
+    def test_geometry_nan_array(self):
+        gdf = GeoDataFrame(
+            {
+                "geometry": [np.nan, None, pd.NA],
+                "something": [np.nan, np.nan, np.nan],
+            },
+            crs="EPSG:4326",
+        )
+        assert gdf.shape == (3, 2)
+        assert gdf.active_geometry_name == "geometry"
+        assert gdf.geometry.isna().all()
+        if compat.HAS_PYPROJ:
+            assert gdf.crs == "EPSG:4326"
+
 
 @pytest.mark.skipif(not compat.HAS_PYPROJ, reason="pyproj not available")
 def test_geodataframe_crs():
@@ -1562,6 +1635,22 @@ def test_geodataframe_crs_colname():
     gdf = GeoDataFrame({"crs": [1], "geometry": [Point(1, 1)]})
     assert gdf.crs is None
     assert gdf["crs"].iloc[0] == 1
+    assert getattr(gdf, "crs") is None
+
+    # https://github.com/geopandas/geopandas/issues/3501
+    gdf = GeoDataFrame({"crs": [1]}, geometry=[Point(1, 1)])
+    assert gdf.crs is None
+    assert gdf["crs"].iloc[0] == 1
+    assert getattr(gdf, "crs") is None
+
+    # test multiindex handling
+    df = pd.DataFrame([[1, 0], [0, 1]], columns=[["crs", "crs"], ["x", "y"]])
+    x_col = df["crs", "x"]
+    y_col = df["crs", "y"]
+
+    gdf = GeoDataFrame(df, geometry=points_from_xy(x_col, y_col))
+    assert gdf.crs is None
+    assert gdf["crs"].iloc[0].to_list() == [1, 0]
     assert getattr(gdf, "crs") is None
 
 
@@ -1645,3 +1734,40 @@ def test_reduce_geometry_array():
     This warning is issued with pandas 2.2.2 (tested).
     """
     GeoDataFrame({"geometry": []}).all()
+
+
+class GDFChild(GeoDataFrame):
+    def custom_method(self):
+        return "this is a custom output"
+
+
+def test_inheritance(dfs):
+    df, _ = dfs
+    df.loc[:, "col2"] = ["a"] * len(df)
+
+    dfc = GDFChild(df)
+
+    dfc2 = dfc.rename_geometry("geometry2")
+
+    children = [
+        dfc,
+        dfc.iloc[[0]],
+        dfc.loc[dfc.col1 == 1],
+        dfc.dissolve(),
+        dfc[["col2", "geometry"]],
+        dfc.copy(),
+        dfc2,
+        dfc2.iloc[[0]],
+        dfc2.loc[dfc.col1 == 1],
+        dfc2.dissolve(),
+        dfc2[["col2", "geometry2"]],
+        dfc2.copy(),
+    ]
+
+    for v in children:
+        assert isinstance(v, GDFChild)
+        assert v.custom_method() == "this is a custom output"
+
+    df2 = dfc2.drop(columns=["geometry2"])
+
+    assert not isinstance(df2, GDFChild)
