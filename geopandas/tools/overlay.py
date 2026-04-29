@@ -345,7 +345,7 @@ def overlay(
         if len(df1) == 0:
             msg = (
                 "`keep_geom_type=True` is invalid when df1 is empty as "
-                "there is no geom type to keep. Setting `keep_geom_type=False`"
+                "there is no geometry type to keep. Setting `keep_geom_type=False`"
             )
             warnings.warn(msg, stacklevel=3)
             keep_geom_type = False
