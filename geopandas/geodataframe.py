@@ -14,7 +14,7 @@ from shapely.geometry import mapping, shape
 from shapely.geometry.base import BaseGeometry
 
 import geopandas
-from geopandas.array import GeometryArray, GeometryDtype, from_shapely, to_wkb, to_wkt
+from geopandas.array import GeometryArray, GeometryDtype, from_shapely, to_wkt
 from geopandas.base import GeoPandasBase, is_geometry_type
 from geopandas.explore import _explore
 from geopandas.geoseries import GeoSeries

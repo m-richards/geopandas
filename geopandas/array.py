@@ -144,6 +144,11 @@ class GeometryDtype(ExtensionDtype):
             return self.engine == other.engine
         return False
 
+    def __hash__(self):
+        # This is here because python requires __hash__ to be defined
+        # if __eq__ is overwritten for something to be hashable
+        return hash(self.crs)
+
 
 register_extension_dtype(GeometryDtype)
 
@@ -595,9 +600,7 @@ class GeometryArray(BaseGeometryArray):
             self.__dict__.update(state)
 
     def to_wkb(self, hex=False, **kwargs):
-        """
-        Convert GeometryArray to a numpy object array of WKB objects.
-        """
+        """Convert GeometryArray to a numpy object array of WKB objects."""
         return shapely.to_wkb(self._data, hex=hex, **kwargs)
 
     # -------------------------------------------------------------------------

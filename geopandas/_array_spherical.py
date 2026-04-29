@@ -2,6 +2,7 @@ import numbers
 import operator
 import warnings
 from functools import lru_cache
+from typing import ClassVar
 
 import numpy as np
 import pandas as pd
@@ -160,9 +161,7 @@ def from_wkt(data, crs=None, on_invalid="raise"):
 
 
 class GeographyArray(BaseGeometryArray):
-    """
-    Class wrapping a numpy array of Spherely objects
-    """
+    """Class wrapping a numpy array of Spherely objects."""
 
     _dtype = GeometryDtype(engine="spherical")
 
@@ -208,7 +207,7 @@ class GeographyArray(BaseGeometryArray):
         initialized until the first use.
 
         See Also
-        ---------
+        --------
         GeoDataFrame.has_sindex
 
         Returns
@@ -235,7 +234,7 @@ class GeographyArray(BaseGeometryArray):
 
     @crs.setter
     def crs(self, value):
-        """Sets the value of the crs"""
+        """Set the value of the crs."""
         if HAS_PYPROJ:
             from pyproj import CRS
 
@@ -332,9 +331,7 @@ class GeographyArray(BaseGeometryArray):
             self.__dict__.update(state)
 
     def to_wkb(self, hex=False, **kwargs):
-        """
-        Convert GeometryArray to a numpy object array of WKB objects.
-        """
+        """Convert GeometryArray to a numpy object array of WKB objects."""
         if hex:
             raise NotImplementedError
         return spherely.to_wkb(self._data, **kwargs)
@@ -669,7 +666,7 @@ class GeographyArray(BaseGeometryArray):
 
     @requires_pyproj
     def to_crs(self, crs=None, epsg=None):
-        """Returns a ``GeometryArray`` with all geometries transformed to a new
+        """Return a ``GeometryArray`` with all geometries transformed to a new
         coordinate reference system.
 
         Transform all geometries in a GeometryArray to a different coordinate
@@ -776,7 +773,7 @@ class GeographyArray(BaseGeometryArray):
 
     @property
     def x(self):
-        """Return the x location of point geometries in a GeoSeries"""
+        """Return the x location of point geometries in a GeoSeries."""
         if (self.geom_type[~self.isna()] == "Point").all():
             return spherely.get_x(self._data)
         else:
@@ -785,7 +782,7 @@ class GeographyArray(BaseGeometryArray):
 
     @property
     def y(self):
-        """Return the y location of point geometries in a GeoSeries"""
+        """Return the y location of point geometries in a GeoSeries."""
         if (self.geom_type[~self.isna()] == "Point").all():
             return spherely.get_y(self._data)
         else:
@@ -794,7 +791,7 @@ class GeographyArray(BaseGeometryArray):
 
     @property
     def z(self):
-        """Return the z location of point geometries in a GeoSeries"""
+        """Return the z location of point geometries in a GeoSeries."""
         raise ValueError("no z coords")
 
     @property
@@ -952,9 +949,7 @@ class GeographyArray(BaseGeometryArray):
                 return np.array(self, dtype=dtype, copy=copy)
 
     def isna(self):
-        """
-        Boolean NumPy array indicating if each value is missing
-        """
+        """Boolean NumPy array indicating if each value is missing."""
         # spherely does not yet support missing values
         return np.full(self.shape, dtype="bool", fill_value=False)
 
@@ -974,7 +969,6 @@ class GeographyArray(BaseGeometryArray):
         -------
         pd.Series
         """
-
         # note ExtensionArray usage of value_counts only specifies dropna,
         # so sort, normalize and bins are not arguments
         values = self.to_wkb()
@@ -1197,7 +1191,7 @@ class GeographyArray(BaseGeometryArray):
         raise TypeError("geometries have no minimum or maximum")
 
     def _formatter(self, boxed=False):
-        """Formatting function for scalar values.
+        """Formatter for scalar values.
 
         This is used in the default '__repr__'. The returned formatting
         function receives instances of your scalar type.
@@ -1231,7 +1225,7 @@ class GeographyArray(BaseGeometryArray):
     @classmethod
     def _concat_same_type(cls, to_concat):
         """
-        Concatenate multiple array
+        Concatenate multiple array.
 
         Parameters
         ----------
@@ -1256,7 +1250,7 @@ class GeographyArray(BaseGeometryArray):
 
     def __array__(self, dtype=None, copy=None):
         """
-        The numpy array interface.
+        Return the numpy array interface.
 
         Returns
         -------
@@ -1296,13 +1290,17 @@ class GeographyArray(BaseGeometryArray):
     def __eq__(self, other):
         return self._binop(other, operator.eq)
 
+    # https://github.com/python/typeshed/issues/2148#issuecomment-520783318
+    # Incompatible types in assignment (expression has type "None", base class
+    # "object" defined the type as "Callable[[object], int]")
+    # (Explicitly mirrored from pandas to declare non hashable)
+    __hash__: ClassVar[None]  # type: ignore[assignment]
+
     def __ne__(self, other):
         return self._binop(other, operator.ne)
 
     def __contains__(self, item):
-        """
-        Return for `item in self`.
-        """
+        """Return for `item in self`."""
         if isna(item):
             if (
                 item is self.dtype.na_value
