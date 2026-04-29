@@ -147,7 +147,7 @@ class GeometryDtype(ExtensionDtype):
     def __hash__(self):
         # This is here because python requires __hash__ to be defined
         # if __eq__ is overwritten for something to be hashable
-        return hash(self.crs)
+        return hash(self.engine)
 
 
 register_extension_dtype(GeometryDtype)
