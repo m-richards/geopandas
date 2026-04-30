@@ -8,7 +8,7 @@ import shapely
 from shapely.geometry import MultiPoint, box
 
 from . import _compat as compat
-from .array import BaseGeometryArray, GeometryArray, GeometryDtype, points_from_xy
+from .array import BaseGeometryArray, GeometryArray, GeometryDtype
 
 
 def is_geometry_type(data):
