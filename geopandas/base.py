@@ -6459,9 +6459,9 @@ GeometryCollection
             if pd.api.types.is_list_like(size):
                 result = [
                     (
-                        points_from_xy(
-                            *sample_function(x, size=s, rng=rng, **kwargs).T
-                        ).union_all()
+                        shapely.multipoints(
+                            sample_function(x, size=s, rng=rng, **kwargs)
+                        )
                         if not (x.is_empty or x is None or "Polygon" not in x.geom_type)
                         else MultiPoint()
                     )
@@ -6470,9 +6470,9 @@ GeometryCollection
             else:
                 result = self.geometry.apply(
                     lambda x: (
-                        points_from_xy(
-                            *sample_function(x, size=size, rng=rng, **kwargs).T
-                        ).union_all()
+                        shapely.multipoints(
+                            sample_function(x, size=size, rng=rng, **kwargs)
+                        )
                         if not (x.is_empty or x is None or "Polygon" not in x.geom_type)
                         else MultiPoint()
                     ),
