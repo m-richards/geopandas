@@ -554,7 +554,7 @@ def test_parquet_missing_metadata(tmpdir, naturalearth_lowres):
     df = DataFrame(df)
 
     # convert the geometry column so we can extract later
-    df["geometry"] = df["geometry"].to_wkb()
+    df["geometry"] = df["geometry"].array.to_wkb()
 
     filename = os.path.join(str(tmpdir), "test.pq")
 
@@ -615,7 +615,7 @@ def test_parquet_invalid_metadata(tmpdir, geo_meta, error, naturalearth_lowres):
 
     # convert to DataFrame and encode geometry to WKB
     df = DataFrame(df)
-    df["geometry"] = df["geometry"].to_wkb()
+    df["geometry"] = df["geometry"].array.to_wkb()
 
     table = Table.from_pandas(df)
     metadata = table.schema.metadata
