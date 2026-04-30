@@ -13,7 +13,7 @@ import shapely
 import shapely.affinity
 import shapely.geometry
 
-from ._compat import HAS_PYPROJ, PANDAS_GE_21, PANDAS_GE_22, requires_pyproj
+from ._compat import HAS_PYPROJ, requires_pyproj
 from .array import BaseGeometryArray, GeometryDtype
 
 if HAS_PYPROJ:
@@ -95,7 +95,8 @@ def from_spherely(data, crs=None):
     else:
         arr = data
 
-    if not shapely.is_geography(arr).all():
+    non_null = [i for i in arr if i is not None]  # TODO not performant
+    if not spherely.is_geography(non_null).all():
         # TODO do we want to support creating from the geo interface?
         # out = []
 
@@ -135,7 +136,7 @@ def from_wkb(data, crs=None, on_invalid="raise"):
 
     """
     # TODO raise for unsupported keyword (and pass through spherely-speficic kwargs)
-    return GeographyArray(shapely.from_wkb(data), crs=crs)
+    return GeographyArray(spherely.from_wkb(data), crs=crs)
 
 
 def from_wkt(data, crs=None, on_invalid="raise"):
@@ -860,14 +861,9 @@ class GeographyArray(BaseGeometryArray):
     def _pad_or_backfill(
         self, method, limit=None, limit_area=None, copy=True, **kwargs
     ):
-        if PANDAS_GE_21 and not PANDAS_GE_22:
-            if limit_area is not None:
-                # limit area not supported, but, but we feed through
-                # so the caller gets the pandas exception
-                kwargs["limit_area"] = limit_area
-        else:
-            kwargs["limit_area"] = limit_area
-        return super()._pad_or_backfill(method=method, limit=limit, copy=copy, **kwargs)
+        return super()._pad_or_backfill(
+            method=method, limit=limit, copy=copy, limit_area=limit_area, **kwargs
+        )
 
     def fillna(self, value=None, method=None, limit=None, copy=True):
         """

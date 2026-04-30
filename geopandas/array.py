@@ -70,7 +70,7 @@ geometry_type_values = np.array(list(type_mapping.values()), dtype=object)
 
 
 class GeometryDtype(ExtensionDtype):
-    name = "geometry"
+    # name = "geometry"
     na_value = None
     engine = "planar"
 
@@ -78,6 +78,8 @@ class GeometryDtype(ExtensionDtype):
 
     def __init__(self, engine="planar"):
         self.engine = engine
+        # TODO I think consensus engine -> compute, and this is something else?
+        #  in parquet, this is logical type, in geoparquet this is edges
 
     @property
     def type(self):
@@ -96,6 +98,8 @@ class GeometryDtype(ExtensionDtype):
             )
         elif string == cls.name:
             return cls()
+        elif string == "geometry[spherical]":
+            return cls(engine="spherical")
         else:
             raise TypeError(f"Cannot construct a '{cls.__name__}' from '{string}'")
 
@@ -112,6 +116,18 @@ class GeometryDtype(ExtensionDtype):
             return "geometry[spherical]"
         else:
             return "geometry"
+
+    def __str__(self):
+        # this is here for BaseConstructorsTest.test_from_dtype
+        return self.__repr__()
+
+    @property
+    def name(self):
+        # must be consistent with __str__
+        if self.engine == "planar":
+            return "geometry"
+        else:
+            return "geometry[spherical]"
 
     def __eq__(self, other: object) -> bool:
         """
